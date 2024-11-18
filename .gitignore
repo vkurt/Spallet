@@ -1,0 +1,9 @@
+# Ignore credentials and secret files
+credentials.json
+*.key
+*.json
+
+
+# Ignore compiled files
+*.exe
+*.out
