@@ -25,7 +25,7 @@ var userAddressBook = addressBook{
 func adddressBookDia(pwd string) {
 
 	// Usage
-	askPwdDia(askPwd, pwd, mainWindowGui, func(correct bool) {
+	askPwdDia(userSettings.AskPwd, pwd, mainWindowGui, func(correct bool) {
 		fmt.Println("result", correct)
 		if !correct {
 			return

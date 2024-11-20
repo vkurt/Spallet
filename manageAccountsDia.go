@@ -22,7 +22,7 @@ import (
 
 func manageAccountsDia(creds Credentials) {
 	// Usage
-	askPwdDia(askPwd, creds.Password, mainWindowGui, func(correct bool) {
+	askPwdDia(userSettings.AskPwd, creds.Password, mainWindowGui, func(correct bool) {
 		fmt.Println("result", correct)
 		if !correct {
 			return

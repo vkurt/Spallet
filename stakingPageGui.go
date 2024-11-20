@@ -38,7 +38,7 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 	kcalClaimButton := widget.NewButton("Forge with Sparks", func() {
 
 		// Usage
-		askPwdDia(askPwd, creds.Password, mainWindowGui, func(correct bool) {
+		askPwdDia(userSettings.AskPwd, creds.Password, mainWindowGui, func(correct bool) {
 			fmt.Println("result", correct)
 			if !correct {
 				return
@@ -114,7 +114,7 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 	var amount = big.NewInt(0)
 
 	stakeButton := widget.NewButton("Power Up", func() {
-		askPwdDia(askPwd, creds.Password, mainWindowGui, func(correct bool) {
+		askPwdDia(userSettings.AskPwd, creds.Password, mainWindowGui, func(correct bool) {
 			fmt.Println("result", correct)
 			if !correct {
 				return
@@ -193,7 +193,7 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 
 	// Coollecting/unstaking stuff
 	collectSoulButton := widget.NewButton("Drain Soul", func() {
-		askPwdDia(askPwd, creds.Password, mainWindowGui, func(correct bool) {
+		askPwdDia(userSettings.AskPwd, creds.Password, mainWindowGui, func(correct bool) {
 			fmt.Println("result", correct)
 			if !correct {
 				return
@@ -357,7 +357,7 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 	registerNameButton := widget.NewButton(nameButtonLabel, func() {
 
 		// Usage
-		askPwdDia(askPwd, creds.Password, mainWindowGui, func(correct bool) {
+		askPwdDia(userSettings.AskPwd, creds.Password, mainWindowGui, func(correct bool) {
 			fmt.Println("result", correct)
 			if !correct {
 				return

@@ -87,7 +87,7 @@ func showSendNFTDia(symbol string, creds Credentials) {
 	// Usage
 
 	nftFeeLimit := new(big.Int).Set(userSettings.DefaultGasLimit)
-	askPwdDia(askPwd, creds.Password, mainWindowGui, func(correct bool) {
+	askPwdDia(userSettings.AskPwd, creds.Password, mainWindowGui, func(correct bool) {
 		fmt.Println("result", correct)
 		if !correct {
 			return

@@ -17,7 +17,7 @@ import (
 )
 
 var lgnTmeOutMnt = 15
-var askPwd = true // will try to use it to ask password before every transaction
+
 var logoutTicker *time.Ticker
 
 func startLogoutTicker(timeout int) {
@@ -41,6 +41,8 @@ func startLogoutTicker(timeout int) {
 
 func openSecurityDia(creds Credentials) {
 	pwd := widget.NewPasswordEntry()
+	var pwdLen int
+	var askPwd = userSettings.AskPwd
 	errorLabel := widget.NewLabel("")
 	security := dialog.NewForm("Dangerous area!", "Confirm", "Cancel", []*widget.FormItem{
 		widget.NewFormItem("", widget.NewLabelWithStyle("Please enter your password", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})),
@@ -75,10 +77,9 @@ func openSecurityDia(creds Credentials) {
 			sendOnlyKnownChck.Checked = userSettings.SendOnly
 
 			var securityForm *widget.Form
-			pwdAskAll := askPwd
-			pwdAskOnly := !askPwd
+
 			// fmt.Println("askPwd", askPwd)
-			var tmeOutValid, pwdValid bool
+			var tmeOutValid, pwdValid, pwdCnfmValid bool
 			saveBttn := widget.NewButtonWithIcon("", theme.ConfirmIcon(), func() {
 				lgnTmeOutMnt, _ = strconv.Atoi(lgnTmeOut.Text)
 				if len(newPwdCnfrm.Text) < 6 {
@@ -121,14 +122,6 @@ func openSecurityDia(creds Credentials) {
 			})
 			saveBttn.Disable()
 
-			formValid := func() {
-				if tmeOutValid && pwdValid {
-					saveBttn.Enable()
-				} else {
-					saveBttn.Disable()
-				}
-			}
-
 			lgnTmeOutFrmItm := widget.NewFormItem("Login Time Out", container.New(layout.NewHBoxLayout(), lgnTmeOut, widget.NewLabel("Minutes (min 3 max 120)"), layout.NewSpacer()))
 			lgnTmeOutFrmItm.HintText = "."
 
@@ -138,13 +131,13 @@ func openSecurityDia(creds Credentials) {
 
 				if !noSpaces {
 					tmeOutValid = false
-					formValid()
+					settingsChanged()
 					lgnTmeOutFrmItm.HintText = "contains space"
 					securityForm.Refresh()
 					return fmt.Errorf("contains space")
 				} else if !matched {
 					tmeOutValid = false
-					formValid()
+					settingsChanged()
 					lgnTmeOutFrmItm.HintText = "only numbers"
 					securityForm.Refresh()
 					return fmt.Errorf("only numbers")
@@ -154,19 +147,19 @@ func openSecurityDia(creds Credentials) {
 
 				if value < 3 {
 					tmeOutValid = false
-					formValid()
+					settingsChanged()
 					lgnTmeOutFrmItm.HintText = "min 3"
 					securityForm.Refresh()
 					return fmt.Errorf("min 3")
 				} else if value > 120 {
 					tmeOutValid = false
-					formValid()
+					settingsChanged()
 					lgnTmeOutFrmItm.HintText = "max 120"
 					securityForm.Refresh()
 					return fmt.Errorf("max 120")
 				} else {
 					tmeOutValid = true
-					formValid()
+
 					lgnTmeOutFrmItm.HintText = ""
 					securityForm.Refresh()
 					settingsChanged() // Call when valid
@@ -175,17 +168,27 @@ func openSecurityDia(creds Credentials) {
 			}
 
 			newPwd.Validator = func(s string) error {
+				pwdLen = len(s)
 				if len(s) < 1 {
 					newPwdCnfrm.SetValidationError(nil)
+					pwdCnfmValid = true
+					pwdValid = true
+					settingsChanged()
 					return nil
 				} else if len(s) < 6 {
+					pwdValid = false
+					settingsChanged()
 					return fmt.Errorf("min 6 characters")
 				} else {
 					err := newPwdCnfrm.Validate()
 					if err != nil {
+						pwdValid = false
 						newPwdCnfrm.SetValidationError(fmt.Errorf("please confirm"))
+						settingsChanged()
 						return fmt.Errorf("confirm password")
 					}
+					pwdValid = true
+					settingsChanged()
 					return nil
 				}
 			}
@@ -194,20 +197,31 @@ func openSecurityDia(creds Credentials) {
 				newPwdEntry, _ := newPwdBind.Get()
 				newPwdCnfrmEntry, _ := newPwdCnfrmBind.Get()
 				fmt.Println("newPwdCnfrm validation", newPwdEntry, newPwdCnfrmEntry)
-				if len(newPwdEntry) < 1 {
+				if len(newPwdEntry) < 1 && len(s) < 1 {
+					pwdCnfmValid = true
+					settingsChanged()
 					return nil
+				} else if len(s) < 6 {
+					pwdCnfmValid = false
+					settingsChanged()
+					return fmt.Errorf("min 6 characters")
 				} else {
 					_, err := pwdMatch(newPwdEntry, newPwdCnfrmEntry)
 					if err != nil {
+						pwdCnfmValid = false
+						settingsChanged()
 						return err
 					} else {
 						newPwd.SetValidationError(nil)
-						settingsChanged() // Call when valid
+						pwdCnfmValid = true
+						pwdValid = true
+						settingsChanged()
 						return nil
 					}
 				}
 			}
-
+			pwdAskAll := askPwd
+			pwdAskOnly := !askPwd
 			pwdAskAllBind := binding.BindBool(&pwdAskAll)
 			pwdAskAllCheck := widget.NewCheckWithData("for everything", pwdAskAllBind)
 			pwdaskLgnBind := binding.BindBool(&pwdAskOnly)
@@ -251,9 +265,13 @@ func openSecurityDia(creds Credentials) {
 			PwdAskTypeChecks := container.New(layout.NewHBoxLayout(), pwdAskAllCheck, pwdAskLgnCheck, layout.NewSpacer())
 
 			settingsChanged = func() {
-				if lgnTmeOutMntStr == lgnTmeOut.Text && askPwd == userSettings.AskPwd && pwdValid && userSettings.SendOnly == sendOnlyKnown {
+				if lgnTmeOutMntStr == lgnTmeOut.Text && askPwd == userSettings.AskPwd && userSettings.SendOnly == sendOnlyKnown && pwdLen < 6 {
+					fmt.Println("Settings not changed")
 					saveBttn.Disable()
-				} else {
+				} else if !pwdValid || !tmeOutValid || !pwdCnfmValid {
+					fmt.Println("Something is wrong", pwdValid, tmeOutValid, pwdCnfmValid)
+					saveBttn.Disable()
+				} else if pwdValid && tmeOutValid && pwdCnfmValid {
 					saveBttn.Enable()
 				}
 			}
@@ -270,16 +288,16 @@ func openSecurityDia(creds Credentials) {
 				currentMainDialog.Hide()
 			})
 
-			securityForm.SetOnValidationChanged(func(err error) {
-				if err == nil {
-					pwdValid = true
-					formValid()
-				} else {
-					pwdValid = false
-					formValid()
-				}
-				settingsChanged()
-			})
+			// securityForm.SetOnValidationChanged(func(err error) {
+			// 	if err == nil {
+			// 		pwdValid = true
+			// 		settingsChanged()
+			// 	} else {
+			// 		pwdValid = false
+			// 		settingsChanged()
+			// 	}
+
+			// })
 
 			securityFormContent := container.NewVScroll(securityForm)
 			securityButtons := container.NewGridWithColumns(2, exitBttn, saveBttn)
