@@ -49,16 +49,24 @@ var defaultSettings = WalletSettings{
 }
 
 func saveAddressBook(adrBk addressBook, pwd string) error {
-	filename := "data/essential/" + "addressbook.spallet"
+	filename := "data/essential/addressbook.spallet"
+
+	// Ensure the directory exists
+	if err := os.MkdirAll(filepath.Dir(filename), 0700); err != nil {
+		return err
+	}
+
 	data, err := json.Marshal(adrBk)
 	if err != nil {
 		return err
 	}
+
 	encryptedData, err := encrypt(data, pwd) // Use password for encryption
 	if err != nil {
 		return err
 	}
-	// fmt.Printf("Saving Encrypted Data: %s\n", encryptedData)
+
+	// Save the encrypted data to the file
 	return os.WriteFile(filename, []byte(encryptedData), 0600)
 }
 
@@ -82,18 +90,27 @@ func loadAddressBook(path, rawPassword string) (addressBook, error) {
 }
 
 func saveCredentials(creds Credentials) error {
-	filename := "data/essential/" + "credentials.spallet"
+	filename := "data/essential/credentials.spallet"
+
+	// Ensure the directory exists
+	if err := os.MkdirAll(filepath.Dir(filename), 0700); err != nil {
+		return err
+	}
+
 	data, err := json.Marshal(creds)
 	if err != nil {
 		return err
 	}
+
 	encryptedData, err := encrypt(data, creds.Password) // Use password for encryption
 	if err != nil {
 		return err
 	}
-	// fmt.Printf("Saving Encrypted Data: %s\n", encryptedData)
+
+	// Save the encrypted data to the file
 	return os.WriteFile(filename, []byte(encryptedData), 0600)
 }
+
 func loadCredentials(path, rawPassword string) (Credentials, error) {
 
 	encryptedData, err := os.ReadFile(path)
@@ -151,7 +168,14 @@ func loadSettings(path string) {
 
 // Save settings to file
 func saveSettings() error {
-	file, err := os.Create("data/essential/settings.spallet")
+	filename := "data/essential/settings.spallet"
+
+	// Ensure the directory exists
+	if err := os.MkdirAll(filepath.Dir(filename), 0700); err != nil {
+		return err
+	}
+
+	file, err := os.Create(filename)
 	if err != nil {
 		return err
 	}
