@@ -14,30 +14,51 @@ This wallet uses SHA256 to securely store your wallet data on your hard drive. H
 ## Features of Spallet
 
 1- Bugs, it means if you found a bug its a feature 
+
 2- Nicknames and badges based on Staked soul
+
 3- Account migration from manage accounts menu
+
 4- Sending assets between your accounts
+
 5- Sending assets to address book recipients
+
 6-Collecting Master rewards
+
 7- Collecting Crown rewards
+
 8-Eligibility badges
+
 9-Detailed Account information
+
 10- Showing some chain statistics
+
 11- Detailed staking information under hodling tab
+
 12- Adjustable log in time out between 3-120 min
+
 13- Send assets to only known addresses
+
 14- Wallet backup/restore from restore point menu
+
 15- Custom network settings
-16- dont have version number :D 
+
+16- dont have version number :D
+
 also some other things i forget :)
 
 **What we dont have in spallet**
+
 1- Phantasma link
+
 2- Showing Nft pictures and details (go SDK limitation and my limited knowledge)
+
 3- Burning tokens
+
 some other things i dont remember
 
 **Planned Features**
+
 I've planned some features for this wallet, like integrating Saturn Dex, but hey, I'm doing this for fun. Feel free to use it as it is. Since it's open-sourced, you can fork it and continue its development or contribute its code if you like.
 
 ## You want to contribute its code? please follow below guide and install necessary things
