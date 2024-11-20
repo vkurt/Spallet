@@ -292,10 +292,31 @@ func showWalletSetupPage(creds Credentials) {
 								}
 
 							} else {
-								if fileName == "credentials.spallet" {
+
+								switch fileName {
+								case "credentials.spallet":
+
 									dialog.ShowInformation("RESTORE FAILED", "cannot find critical file\nPlease make sure folder you selected includes 'credentials.spallet'", mainWindowGui)
 									return
+
+								case "settings.spallet":
+
+									userSettings = defaultSettings
+
+									if err := saveSettings(); err != nil {
+										log.Println("Failed to save Settings:", err)
+										dialog.ShowInformation("Error", "Failed to save Settings: "+err.Error(), mainWindowGui)
+										return
+									}
+								case "addressbook.spallet":
+									if err := saveAddressBook(userAddressBook, creds.Password); err != nil {
+										log.Println("Failed to save Addressbook:", err)
+										dialog.ShowInformation("Error", "Failed to save Addressbook: "+err.Error(), mainWindowGui)
+										return
+									}
+
 								}
+
 								notFoundFiles += fmt.Sprintf(fileName + "\n")
 							}
 
@@ -312,7 +333,7 @@ func showWalletSetupPage(creds Credentials) {
 							restoreInfo += fmt.Sprintf("Found %v new addresses and added them into your address book\n", foundAddress)
 
 						} else {
-							restoreInfo += fmt.Sprintln("Cant find any new address.")
+							restoreInfo += fmt.Sprintln("Cant find any new address for Address book.")
 						}
 
 						if settingsRestored {
@@ -411,13 +432,27 @@ func generateNewWalletPage(creds Credentials) {
 			log.Println("Failed to save credentials:", err)
 			dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
 			return
-		} else {
-			showUpdatingDialog()
-			dataFetch(creds)
-			mainWindow(creds, regularTokens, nftTokens)
-			closeUpdatingDialog()
-			startLogoutTicker(15)
 		}
+
+		userSettings = defaultSettings
+
+		if err := saveSettings(); err != nil {
+			log.Println("Failed to save Settings:", err)
+			dialog.ShowInformation("Error", "Failed to save Settings: "+err.Error(), mainWindowGui)
+			return
+		}
+
+		if err := saveAddressBook(userAddressBook, creds.Password); err != nil {
+			log.Println("Failed to save Addressbook:", err)
+			dialog.ShowInformation("Error", "Failed to save Addressbook: "+err.Error(), mainWindowGui)
+			return
+		}
+
+		showUpdatingDialog()
+		dataFetch(creds)
+		mainWindow(creds, regularTokens, nftTokens)
+		closeUpdatingDialog()
+		startLogoutTicker(15)
 
 	})
 	okButton.Disable() // Initially disable the Continue button
@@ -499,13 +534,27 @@ func showImportWifPage(creds Credentials) {
 			log.Println("Failed to save credentials:", err)
 			dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
 			return
-		} else {
-			showUpdatingDialog()
-			dataFetch(creds)
-			mainWindow(creds, regularTokens, nftTokens)
-			closeUpdatingDialog()
-			startLogoutTicker(15)
 		}
+
+		userSettings = defaultSettings
+
+		if err := saveSettings(); err != nil {
+			log.Println("Failed to save Settings:", err)
+			dialog.ShowInformation("Error", "Failed to save Settings: "+err.Error(), mainWindowGui)
+			return
+		}
+
+		if err := saveAddressBook(userAddressBook, creds.Password); err != nil {
+			log.Println("Failed to save Addressbook:", err)
+			dialog.ShowInformation("Error", "Failed to save Addressbook: "+err.Error(), mainWindowGui)
+			return
+		}
+		showUpdatingDialog()
+		dataFetch(creds)
+		mainWindow(creds, regularTokens, nftTokens)
+		closeUpdatingDialog()
+		startLogoutTicker(15)
+
 	})
 	importButton.Disabled()
 	wifEntryForm := widget.NewForm(

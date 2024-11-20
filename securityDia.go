@@ -296,7 +296,7 @@ func openSecurityDia(creds Credentials) {
 		}
 
 	}, mainWindowGui)
-
+	security.Resize(fyne.NewSize(368, 207))
 	currentMainDialog = security
 	currentMainDialog.Show()
 	mainWindowGui.Canvas().Focus(pwd)

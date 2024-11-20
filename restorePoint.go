@@ -50,7 +50,7 @@ func showBackupDia(creds Credentials) {
 					dialog.ShowInformation("Success", "All data saved successfully!", mainWindowGui)
 				}
 			}, mainWindowGui)
-			bckupDia.Resize(fyne.NewSize(600, 340))
+			bckupDia.Resize(fyne.NewSize(mainWindowGui.Canvas().Size().Width-50, mainWindowGui.Canvas().Size().Height-50))
 			bckupDia.SetConfirmText("Save Here")
 			bckupDia.SetDismissText("Cancel")
 			bckupDia.Show()
