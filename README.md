@@ -1,65 +1,52 @@
-## What is Spallet
-Spallet is a community wallet developed for the Phantasma Blockchain. The name is a playful blend of Sparky, Specky (mostly Sparky), and Wallet—resulting in Spallet. I aimed for a catchy and fun name for this wallet.
+# Spallet - The Community Wallet for Phantasma Blockchain
 
-With Spallet, I want to inject some fun and creativity into the world of crypto wallets by reflecting a gaming-oriented chain with small animations, humor, and more. Although I am not a highly experienced developer, my goal is to create a wallet that is engaging and enjoyable to use.
+## What is Spallet?
+Spallet is a community-driven wallet designed for the Phantasma Blockchain. The name Spallet is a playful fusion of Sparky, Specky (mostly Sparky), and Wallet. I wanted a name that's catchy and fun, reflecting the spirit of this wallet.
 
-I developed Spallet partly because I don't like Poltergeist's design and particularly dislike seeing that guy's name still on its license. I hope Spallet can help foster a new culture within the Phantasma community—who knows what we might achieve, right?
+The goal with Spallet is to bring a touch of fun and creativity to crypto wallets by incorporating small animations, humor, and more, all while reflecting the gaming-oriented nature of the chain. Although I might not be the most experienced developer, I aim to create a wallet that's both engaging and enjoyable to use.
+
+I created Spallet partly because I was dissatisfied with Poltergeist's design and didn't want to see certain names on its license anymore. I hope Spallet can cultivate a new culture within the Phantasma community—who knows what we might achieve together!
 
 ## Disclaimer
-This wallet is open-sourced and developed with the guidance of AI. The creator is not a security expert and will not accept any responsibility for any potential losses. Use at your own risk!
-Translation of Disclaimer: I’m not a security guru, so if you lose your moon bag, please don’t sue me.
+This wallet is open-source and developed with the guidance of AI. The creator is not a security expert and will not accept any responsibility for potential losses. Use at your own risk!
 
-This wallet uses SHA256 to securely store your wallet data on your hard drive. However, given my limited expertise, please exercise caution and do not solely rely on this security measure.
+*Translation of Disclaimer: I’m not a security guru, so if you lose your moon bag, please don’t sue me.*
+
+Spallet uses SHA256 to securely store your wallet data on your hard drive. However, given my limited expertise, please exercise caution and do not rely solely on this security measure.
 
 ## Features of Spallet
 
-1- Bugs, it means if you found a bug its a feature 
+1. **Bugs**: If you find a bug, consider it a feature!
+2. **Nicknames and Badges**: Based on Staked Soul.
+3. **Account Migration**: From the manage accounts menu.
+4. **Asset Transfer**: Between your accounts.
+5. **Send Assets**: To address book recipients.
+6. **Master Rewards**: Collect your rewards.
+7. **Crown Rewards**: Collect your rewards.
+8. **Eligibility Badges**: Show off your status.
+9. **Detailed Account Information**: Get all the details about your account.
+10. **Chain Statistics**: Stay informed with chain stats.
+11. **Staking Information**: Detailed info under the hodling tab.
+12. **Adjustable Login Timeout**: Between 3-120 minutes.
+13. **Send Assets**: To only known addresses.
+14. **Wallet Backup/Restore**: From the restore point menu.
+15. **Custom Network Settings**.
+16. **No Version Number**: Just enjoy the updates!
 
-2- Nicknames and badges based on Staked soul
+Also, there are some other features I might have forgotten to mention!
 
-3- Account migration from manage accounts menu
+## What Spallet Doesn't Have
 
-4- Sending assets between your accounts
+1. **Phantasma Link**.
+2. **NFT Pictures and Details**: Due to Go SDK limitations and my limited knowledge.
+3. **Token Burning**.
 
-5- Sending assets to address book recipients
+And perhaps some other features I can't recall right now.
 
-6-Collecting Master rewards
+## Planned Features
+I’ve got some exciting plans for Spallet, like integrating Saturn Dex. However, since this is a fun project, feel free to use it as is. Since it's open-source, you can fork it, continue its development, or even contribute to the codebase!
 
-7- Collecting Crown rewards
+## Contributing
+Want to contribute to Spallet? Please follow the guide below and install the necessary tools:
+[Getting Started with Fyne](https://docs.fyne.io/started/)
 
-8-Eligibility badges
-
-9-Detailed Account information
-
-10- Showing some chain statistics
-
-11- Detailed staking information under hodling tab
-
-12- Adjustable log in time out between 3-120 min
-
-13- Send assets to only known addresses
-
-14- Wallet backup/restore from restore point menu
-
-15- Custom network settings
-
-16- dont have version number :D
-
-also some other things i forget :)
-
-**What we dont have in spallet**
-
-1- Phantasma link
-
-2- Showing Nft pictures and details (go SDK limitation and my limited knowledge)
-
-3- Burning tokens
-
-some other things i dont remember
-
-**Planned Features**
-
-I've planned some features for this wallet, like integrating Saturn Dex, but hey, I'm doing this for fun. Feel free to use it as it is. Since it's open-sourced, you can fork it and continue its development or contribute its code if you like.
-
-## You want to contribute its code? please follow below guide and install necessary things
-https://docs.fyne.io/started/
