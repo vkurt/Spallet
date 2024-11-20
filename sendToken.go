@@ -18,7 +18,7 @@ import (
 	scriptbuilder "github.com/phantasma-io/phantasma-go/pkg/vm/script_builder"
 )
 
-func confirmSendToken(WIF, tokenSymbol, to string, tokenAmount *big.Int, creds Credentials, name string) error {
+func confirmSendToken(WIF, tokenSymbol, to string, tokenAmount *big.Int, creds Credentials, name string, tokenFeeLimit *big.Int) error {
 	// Show confirmation dialog
 	sendTokenDecimal := latestAccountData.FungibleTokens[tokenSymbol].Decimals
 	var confirmMessage string
@@ -32,7 +32,7 @@ func confirmSendToken(WIF, tokenSymbol, to string, tokenAmount *big.Int, creds C
 	dialog.ShowConfirm("Confirm Transaction", confirmMessage, func(confirmed bool) {
 		if confirmed {
 			// Proceed with transaction if user confirmed
-			go sendTransaction(WIF, tokenSymbol, to, tokenAmount, creds)
+			go sendTransaction(WIF, tokenSymbol, to, tokenAmount, creds, tokenFeeLimit)
 		} else {
 			// Handle abort action
 			return
@@ -42,7 +42,7 @@ func confirmSendToken(WIF, tokenSymbol, to string, tokenAmount *big.Int, creds C
 	return nil
 }
 
-func sendTransaction(WIF, tokenSymbol, to string, tokenAmount *big.Int, creds Credentials) {
+func sendTransaction(WIF, tokenSymbol, to string, tokenAmount *big.Int, creds Credentials, tokenFeeLimit *big.Int) {
 	keyPair, err := cryptography.FromWIF(WIF)
 	if err != nil {
 		fyne.CurrentApp().SendNotification(&fyne.Notification{
@@ -62,12 +62,12 @@ func sendTransaction(WIF, tokenSymbol, to string, tokenAmount *big.Int, creds Cr
 	// fmt.Println("Expiration time ", time.Unix(expire, 0).Format("2006-01-02 15:04:05"))
 
 	sb := scriptbuilder.BeginScript()
-	sb.AllowGas(keyPair.Address().String(), cryptography.NullAddress().String(), gasPrice, gasLimit)
+	sb.AllowGas(keyPair.Address().String(), cryptography.NullAddress().String(), userSettings.GasPrice, tokenFeeLimit)
 	sb.TransferTokens(tokenSymbol, keyPair.Address().String(), to, tokenAmount)
 	sb.SpendGas(keyPair.Address().String())
 	script := sb.EndScript()
 
-	tx := blockchain.NewTransaction(network, chain, script, uint32(expire), payload)
+	tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
 	tx.Sign(keyPair)
 	txHex := hex.EncodeToString(tx.Bytes())
 	// fmt.Println("*****Tx: \n" + txHex)
@@ -85,6 +85,8 @@ func sendTransaction(WIF, tokenSymbol, to string, tokenAmount *big.Int, creds Cr
 
 func showSendTokenDia(symbol string, creds Credentials, decimal int8) {
 	// Usage
+
+	tokenFeeLimit := new(big.Int).Set(userSettings.DefaultGasLimit)
 	askPwdDia(askPwd, creds.Password, mainWindowGui, func(correct bool) {
 		fmt.Println("result", correct)
 		if !correct {
@@ -181,7 +183,7 @@ func showSendTokenDia(symbol string, creds Credentials, decimal int8) {
 				dialog.ShowError(err, mainWindowGui)
 				return
 			} else {
-				confirmSendToken(creds.Wallets[creds.LastSelectedWallet].WIF, symbol, recipientEntry, amountBigInt, creds, name)
+				confirmSendToken(creds.Wallets[creds.LastSelectedWallet].WIF, symbol, recipientEntry, amountBigInt, creds, name, tokenFeeLimit)
 			}
 
 		})
@@ -189,8 +191,8 @@ func showSendTokenDia(symbol string, creds Credentials, decimal int8) {
 
 		amount.PlaceHolder = fmt.Sprintf("Please enter %s amount for delivery", symbol)
 
-		gasLimitFloat, _ := gasLimit.Float64()
-		gasSlider := widget.NewSlider(10000, 100000)
+		gasLimitFloat, _ := tokenFeeLimit.Float64()
+		gasSlider := widget.NewSlider(userSettings.GasLimitSliderMin, userSettings.GasLimitSliderMax)
 		gasSlider.Value = gasLimitFloat
 		gasSliderLabel := widget.NewLabelWithStyle("Specky's energy limit", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 		warning := binding.NewString()
@@ -207,7 +209,7 @@ func showSendTokenDia(symbol string, creds Credentials, decimal int8) {
 				return
 			}
 
-			feeAmount := new(big.Int).Mul(gasPrice, gasLimit)
+			feeAmount := new(big.Int).Mul(userSettings.GasPrice, tokenFeeLimit)
 			if symbol == "KCAL" {
 				feeAmount = feeAmount.Add(amountBigInt, feeAmount)
 			}
@@ -237,7 +239,7 @@ func showSendTokenDia(symbol string, creds Credentials, decimal int8) {
 
 		var amountBox *fyne.Container
 		maxButton := widget.NewButton("Max", func() {
-			feeAmount := new(big.Int).Mul(gasLimit, gasPrice)
+			feeAmount := new(big.Int).Mul(tokenFeeLimit, userSettings.GasPrice)
 			if symbol == "KCAL" {
 				if feeAmount.Cmp(&token.Amount) < 0 {
 					maxAmount := new(big.Int).Sub(&token.Amount, feeAmount)
@@ -355,7 +357,7 @@ func showSendTokenDia(symbol string, creds Credentials, decimal int8) {
 				return errors.New("amount is zero")
 			}
 			if symbol == "KCAL" {
-				feeAmount := new(big.Int).Mul(gasLimit, gasPrice)
+				feeAmount := new(big.Int).Mul(tokenFeeLimit, userSettings.GasPrice)
 				validateUserAmount = new(big.Int).Add(validateUserAmount, feeAmount)
 			}
 			if validateUserAmount.Cmp(&token.Amount) <= 0 {
@@ -380,7 +382,7 @@ func showSendTokenDia(symbol string, creds Credentials, decimal int8) {
 
 		sendTokenDiaContent := container.NewBorder(nil, buttonsBox, nil, nil, container.NewVBox(recipientBox, amountBox, gasSliderBox))
 		gasSlider.OnChanged = func(value float64) {
-			gasLimit.SetInt64(int64(value))
+			tokenFeeLimit.SetInt64(int64(value))
 			updateSendButtonState()
 
 		}

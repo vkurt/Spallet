@@ -85,159 +85,163 @@ func showBackupDia(creds Credentials) {
 						pwd = s
 					}
 					pwdEntryFrmItm := widget.NewFormItem("Password", pwdEntry)
-					askPwdDia := dialog.NewForm("Enter Password", "Continue", "Cancel", []*widget.FormItem{
+					askPwdDia := dialog.NewForm("Enter Password for this data", "Continue", "Cancel", []*widget.FormItem{
 						pwdEntryFrmItm,
 					}, func(b bool) {
-						foundAccounts := 0
-						foundAddress := 0
-						settingsRestored := false
-						for _, fileName := range expectedFiles {
-							filePath := filepath.Join(directory, fileName)
-							if _, err := os.Stat(filePath); err == nil {
-								foundFiles += fmt.Sprintf(fileName + "\n")
+						if b {
+							foundAccounts := 0
+							foundAddress := 0
+							settingsRestored := false
+							for _, fileName := range expectedFiles {
+								filePath := filepath.Join(directory, fileName)
+								if _, err := os.Stat(filePath); err == nil {
+									foundFiles += fmt.Sprintf(fileName + "\n")
 
-								switch fileName {
-								case "credentials.spallet": // restoring unsaved accounts
-									// fmt.Println(pwd)
-									ldCreds, err := loadCredentials(filePath, pwd)
-									if err != nil {
-										dialog.ShowError(err, mainWindowGui)
-										return
-									}
+									switch fileName {
+									case "credentials.spallet": // restoring unsaved accounts
+										// fmt.Println(pwd)
+										ldCreds, err := loadCredentials(filePath, pwd)
+										if err != nil {
+											dialog.ShowError(err, mainWindowGui)
+											return
+										}
 
-									for _, ldCredsWallet := range ldCreds.Wallets {
-										isSavedWallet := false
-										isSavedName := false
-										// fmt.Println("restore wallet", ldCredsWallet.Name)
-										for _, savedWallet := range creds.Wallets {
+										for _, ldCredsWallet := range ldCreds.Wallets {
+											isSavedWallet := false
+											isSavedName := false
+											// fmt.Println("restore wallet", ldCredsWallet.Name)
+											for _, savedWallet := range creds.Wallets {
 
-											if savedWallet.WIF == ldCredsWallet.WIF {
-												isSavedWallet = true
+												if savedWallet.WIF == ldCredsWallet.WIF {
+													isSavedWallet = true
+
+												}
+												if savedWallet.Name == ldCredsWallet.Name {
+													isSavedName = true
+												}
 
 											}
-											if savedWallet.Name == ldCredsWallet.Name {
-												isSavedName = true
+
+											if !isSavedWallet && isSavedName {
+												name := fmt.Sprintf("%v...%v", ldCredsWallet.Name[:8], ldCredsWallet.Name[len(ldCredsWallet.Name)-8:len(ldCredsWallet.Name)]) //if user registered same name giving it to a new name
+												walletToAdd := Wallet{
+													Name:    name,
+													Address: ldCredsWallet.Address,
+													WIF:     ldCredsWallet.WIF,
+												}
+												foundAccounts++
+												creds.Wallets[name] = walletToAdd
+												creds.WalletOrder = append(creds.WalletOrder, name)
+											} else if !isSavedWallet && !isSavedName {
+												creds.Wallets[ldCredsWallet.Name] = ldCredsWallet
+												creds.WalletOrder = append(creds.WalletOrder, ldCredsWallet.Name)
+												foundAccounts++
+											}
+
+										}
+									case "addressbook.spallet": // restoring unsaved addresses to addressbook
+										ldAdrBk, err := loadAddressBook(filePath, pwd)
+										if err != nil {
+											dialog.ShowError(err, mainWindowGui)
+											return
+										}
+
+										for _, ldAddrBkAddr := range ldAdrBk.Wallets {
+											isSavedWallet := false
+											isSavedName := false
+											fmt.Println("restore adress", ldAddrBkAddr.Name)
+											for _, savedAddr := range userAddressBook.Wallets {
+
+												if savedAddr.Address == ldAddrBkAddr.Address {
+													isSavedWallet = true
+
+												}
+												if savedAddr.Name == ldAddrBkAddr.Name {
+													isSavedName = true
+												}
+
+											}
+
+											if !isSavedWallet && isSavedName {
+												name := fmt.Sprintf("%v...%v", ldAddrBkAddr.Address[:8], ldAddrBkAddr.Address[len(ldAddrBkAddr.Address)-8:len(ldAddrBkAddr.Address)])
+												walletToAdd := Wallet{
+													Name:    name,
+													Address: ldAddrBkAddr.Address,
+												}
+												foundAddress++
+												userAddressBook.Wallets[name] = walletToAdd
+												userAddressBook.WalletOrder = append(userAddressBook.WalletOrder, name)
+											} else if !isSavedWallet && !isSavedName {
+												userAddressBook.Wallets[ldAddrBkAddr.Name] = ldAddrBkAddr
+												userAddressBook.WalletOrder = append(userAddressBook.WalletOrder, ldAddrBkAddr.Name)
+												foundAddress++
 											}
 
 										}
 
-										if !isSavedWallet && isSavedName {
-											name := fmt.Sprintf("%v...%v", ldCredsWallet.Name[:8], ldCredsWallet.Name[len(ldCredsWallet.Name)-8:len(ldCredsWallet.Name)]) //if user registered same name giving it to a new name
-											walletToAdd := Wallet{
-												Name:    name,
-												Address: ldCredsWallet.Address,
-												WIF:     ldCredsWallet.WIF,
-											}
-											foundAccounts++
-											creds.Wallets[name] = walletToAdd
-											creds.WalletOrder = append(creds.WalletOrder, name)
-										} else if !isSavedWallet && !isSavedName {
-											creds.Wallets[ldCredsWallet.Name] = ldCredsWallet
-											creds.WalletOrder = append(creds.WalletOrder, ldCredsWallet.Name)
-											foundAccounts++
-										}
-
-									}
-								case "addressbook.spallet": // restoring unsaved addresses to addressbook
-									ldAdrBk, err := loadAddressBook(filePath, pwd)
-									if err != nil {
-										dialog.ShowError(err, mainWindowGui)
-										return
-									}
-
-									for _, ldAddrBkAddr := range ldAdrBk.Wallets {
-										isSavedWallet := false
-										isSavedName := false
-										fmt.Println("restore adress", ldAddrBkAddr.Name)
-										for _, savedAddr := range userAddressBook.Wallets {
-
-											if savedAddr.Address == ldAddrBkAddr.Address {
-												isSavedWallet = true
-
-											}
-											if savedAddr.Name == ldAddrBkAddr.Name {
-												isSavedName = true
-											}
-
-										}
-
-										if !isSavedWallet && isSavedName {
-											name := fmt.Sprintf("%v...%v", ldAddrBkAddr.Address[:8], ldAddrBkAddr.Address[len(ldAddrBkAddr.Address)-8:len(ldAddrBkAddr.Address)])
-											walletToAdd := Wallet{
-												Name:    name,
-												Address: ldAddrBkAddr.Address,
-											}
-											foundAddress++
-											userAddressBook.Wallets[name] = walletToAdd
-											userAddressBook.WalletOrder = append(userAddressBook.WalletOrder, name)
-										} else if !isSavedWallet && !isSavedName {
-											userAddressBook.Wallets[ldAddrBkAddr.Name] = ldAddrBkAddr
-											userAddressBook.WalletOrder = append(userAddressBook.WalletOrder, ldAddrBkAddr.Name)
-											foundAddress++
-										}
+									case "settings.spallet": //restoring user settings
+										loadSettings(filePath)
+										saveSettings()
+										settingsRestored = true
 
 									}
 
-								case "settings.spallet": //restoring user settings
-									loadSettings(filePath)
-									saveSettings()
-									settingsRestored = true
-
+								} else {
+									notFoundFiles += fmt.Sprintf(fileName + "\n")
 								}
 
+							}
+
+							restoreInfo := ""
+							if foundAccounts > 0 {
+								restoreInfo += fmt.Sprintf("Found %v new accounts and added them to your wallet data\n", foundAccounts)
 							} else {
-								notFoundFiles += fmt.Sprintf(fileName + "\n")
+								restoreInfo += fmt.Sprintln("Cant find any new account")
 							}
 
-						}
+							if foundAddress > 0 {
+								restoreInfo += fmt.Sprintf("Found %v new addresses and added them into your address book\n", foundAddress)
 
-						restoreInfo := ""
-						if foundAccounts > 0 {
-							restoreInfo += fmt.Sprintf("Found %v new accounts and added them to your wallet data\n", foundAccounts)
-						} else {
-							restoreInfo += fmt.Sprintln("Cant find any new account")
-						}
-
-						if foundAddress > 0 {
-							restoreInfo += fmt.Sprintf("Found %v new addresses and added them into your address book\n", foundAddress)
-
-						} else {
-							restoreInfo += fmt.Sprintln("Cant find any new address.")
-						}
-
-						if settingsRestored {
-							restoreInfo += fmt.Sprintln("Found settings and applied")
-						} else {
-							restoreInfo += fmt.Sprintln("Cant find settings")
-						}
-
-						restoreInfo += fmt.Sprintf("\nFound Files\n%s\nNot Found Files\n%s", foundFiles, notFoundFiles)
-
-						if foundAccounts > 0 || foundAddress > 0 || settingsRestored {
-							fmt.Println("foundAccounts", foundAccounts)
-							if err := saveCredentials(creds); err != nil {
-								log.Println("Failed to save credentials:", err)
-								dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
+							} else {
+								restoreInfo += fmt.Sprintln("Cant find any new address.")
 							}
 
-							if err := saveAddressBook(userAddressBook, creds.Password); err != nil {
-								log.Println("Failed to save Address Book:", err)
-								dialog.ShowInformation("Error", "Failed to save Address Book: "+err.Error(), mainWindowGui)
+							if settingsRestored {
+								restoreInfo += fmt.Sprintln("Found settings and applied")
+							} else {
+								restoreInfo += fmt.Sprintln("Cant find settings")
 							}
-							currentMainDialog.Hide()
-							dialog.ShowInformation("Found new data", restoreInfo, mainWindowGui)
-							mainWindow(creds, regularTokens, nftTokens)
 
-						} else {
+							restoreInfo += fmt.Sprintf("\nFound Files\n%s\nNot Found Files\n%s", foundFiles, notFoundFiles)
 
-							dialog.ShowInformation("Restore Failed", fmt.Sprintf("Cant find any new data please make sure file names are correct or your wallet data same with backup data\nFound Files\n%s\nNot Found Files\n%s", foundFiles, notFoundFiles), mainWindowGui)
+							if foundAccounts > 0 || foundAddress > 0 || settingsRestored {
+								fmt.Println("foundAccounts", foundAccounts)
+								if err := saveCredentials(creds); err != nil {
+									log.Println("Failed to save credentials:", err)
+									dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
+								}
 
+								if err := saveAddressBook(userAddressBook, creds.Password); err != nil {
+									log.Println("Failed to save Address Book:", err)
+									dialog.ShowInformation("Error", "Failed to save Address Book: "+err.Error(), mainWindowGui)
+								}
+								currentMainDialog.Hide()
+								restoreDia.Hide()
+								dialog.ShowInformation("Found new data", restoreInfo, mainWindowGui)
+								mainWindow(creds, regularTokens, nftTokens)
+
+							} else {
+
+								dialog.ShowInformation("Restore Failed", fmt.Sprintf("Cant find any new data please make sure file names are correct or your wallet data same with backup data\nFound Files\n%s\nNot Found Files\n%s", foundFiles, notFoundFiles), mainWindowGui)
+
+							}
 						}
 					}, mainWindowGui)
 					askPwdDia.Show()
+					mainWindowGui.Canvas().Focus(pwdEntry)
 				}, mainWindowGui)
 				openFolderDia.SetConfirmText("Restore From Here")
-				openFolderDia.Resize(fyne.NewSize(600, 340))
+				openFolderDia.Resize(fyne.NewSize(mainWindowGui.Canvas().Size().Width-50, mainWindowGui.Canvas().Size().Height-50))
 				openFolderDia.Show()
 
 			})

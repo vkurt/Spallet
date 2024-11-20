@@ -131,7 +131,7 @@ func adddressBookDia(pwd string) {
 				moveButtons := container.NewGridWithColumns(2, moveUpBttn, moveTopBttn, moveDownBttn, moveBotBttn)
 				renameButton := widget.NewButtonWithIcon("", theme.DocumentCreateIcon(), func() {
 					renameEntry := widget.NewEntry()
-					renameEntry.PlaceHolder = "Enter new name for account"
+					renameEntry.PlaceHolder = "Enter new name for address"
 					nameEntryWarningFrst := ""
 					nameEntryWarning := binding.BindString(&nameEntryWarningFrst)
 					nameEntryWarningLabel := widget.NewLabelWithData(nameEntryWarning)
@@ -184,7 +184,7 @@ func adddressBookDia(pwd string) {
 
 				removeBttn := widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
 
-					dialog.ShowForm("Remove Account", "Remove", "Cancel", []*widget.FormItem{
+					dialog.ShowForm("Remove Address", "Remove", "Cancel", []*widget.FormItem{
 
 						widget.NewFormItem("Name", widget.NewLabel(wallet.Name)),
 						widget.NewFormItem("Address", widget.NewLabel(wallet.Address)),
@@ -202,7 +202,7 @@ func adddressBookDia(pwd string) {
 							if err := saveAddressBook(userAddressBook, pwd); err != nil {
 								dialog.ShowError(err, fyne.CurrentApp().Driver().AllWindows()[0])
 							}
-							adddressBookDia = dialog.NewInformation("Account Removed", "Account removed succesfully", mainWindowGui)
+							adddressBookDia = dialog.NewInformation("Address Removed", "Address removed succesfully", mainWindowGui)
 							buildWalletButtons()
 							adddressBookDia.Show()
 							walletScroll.Content.Refresh()
@@ -225,18 +225,18 @@ func adddressBookDia(pwd string) {
 
 		buildWalletButtons()
 		if len(userAddressBook.WalletOrder) < 1 {
-			walletButtons.Add(container.NewVBox(widget.NewLabel("Please Add an account")))
+			walletButtons.Add(container.NewVBox(widget.NewLabel("Please Add an dddress")))
 		}
 		walletScroll = container.NewVScroll(walletButtons)
 
 		walletScroll.SetMinSize(fyne.NewSize(600, 400))
 
-		addWallet := widget.NewButtonWithIcon("Add Account", theme.ContentAddIcon(), func() {
+		addWallet := widget.NewButtonWithIcon("Add Address", theme.ContentAddIcon(), func() {
 
 			walletnamefrst := ""
 			walletNameBind := binding.BindString(&walletnamefrst)
 			walletNameEntry := widget.NewEntryWithData(walletNameBind)
-			walletNameEntry.PlaceHolder = "Enter a name for account"
+			walletNameEntry.PlaceHolder = "Enter a name for address"
 			nameSuggest := fmt.Sprintf("Sparky address %v", len(userAddressBook.WalletOrder)+1)
 			walletNameEntry.SetText(nameSuggest)
 			warningFrst := ""
@@ -245,7 +245,7 @@ func adddressBookDia(pwd string) {
 			warningLabel.Wrapping = fyne.TextWrapWord
 
 			addressEntry := widget.NewEntry()
-			addressEntry.PlaceHolder = "Enter account address"
+			addressEntry.PlaceHolder = "Enter an address"
 			addressEntry.Validator = func(s string) error {
 				result, err := validateAccountInput(nil, userAddressBook.Wallets, "", "address", true, s)
 				nameEntryWarning.Set(result)
@@ -261,7 +261,7 @@ func adddressBookDia(pwd string) {
 
 			}
 
-			addForm := dialog.NewForm("Add New Wallet", "Save", "Cancel", []*widget.FormItem{
+			addForm := dialog.NewForm("Add New Address", "Save", "Cancel", []*widget.FormItem{
 				widget.NewFormItem("Name", walletNameEntry),
 				widget.NewFormItem("Address", addressEntry),
 				widget.NewFormItem("", warningLabel),
@@ -280,7 +280,7 @@ func adddressBookDia(pwd string) {
 						log.Println("Failed to save adress book:", err)
 						dialog.ShowInformation("Error", "Failed to save adress book: "+err.Error(), mainWindowGui)
 					} else {
-						adddressBookDia = dialog.NewInformation("Account saved", "Account saved successfully", mainWindowGui)
+						adddressBookDia = dialog.NewInformation("Address saved", "Address saved successfully", mainWindowGui)
 						adddressBookDia.Show()
 						buildWalletButtons()
 						walletScroll.Content.Refresh()

@@ -32,7 +32,7 @@ func getAccountData(walletAddress string, creds Credentials) error {
 	}
 
 	if passedTime > 9 {
-		actualTxCount, err = client.GetAddressTransactionCount(walletAddress, chain)
+		actualTxCount, err = client.GetAddressTransactionCount(walletAddress, userSettings.ChainName)
 		if err != nil {
 			return err
 		}
@@ -48,7 +48,7 @@ func getAccountData(walletAddress string, creds Credentials) error {
 			NonFungible:    make(map[string]AccToken),
 		}
 
-	} else if latestAccountData.Address != walletAddress || latestAccountData.Network != network {
+	} else if latestAccountData.Address != walletAddress || latestAccountData.Network != userSettings.NetworkName {
 		fetchAccData = true
 		latestAccountData = AccountInfoData{
 			FungibleTokens: make(map[string]AccToken),
@@ -60,7 +60,7 @@ func getAccountData(walletAddress string, creds Credentials) error {
 		latestAccountData.StatCheckTime = currentUtcTime.Unix()
 		latestAccountData.Address = walletAddress
 		latestAccountData.TransactionCount = actualTxCount
-		latestAccountData.Network = network
+		latestAccountData.Network = userSettings.NetworkName
 		fmt.Println("******Refreshing data from chain for Account data*********")
 		accountSummary = nil
 
@@ -243,7 +243,7 @@ func getAccountData(walletAddress string, creds Credentials) error {
 		}
 
 		if check >= 1 {
-			checkResponse1, err := client.InvokeRawScript(chain, encodedScript1)
+			checkResponse1, err := client.InvokeRawScript(userSettings.ChainName, encodedScript1)
 			if err != nil {
 				panic("Script1 invocation failed! Error: " + err.Error())
 			}
@@ -466,7 +466,7 @@ func buildBadges() *fyne.Container {
 		stakingBadgePath = "img/stats/Kcal_ns.png"
 	}
 
-	if network == "mainnet" {
+	if userSettings.NetworkName == "mainnet" {
 		networkBadgePath = "img/stats/mainnet.png"
 	} else {
 		networkBadgePath = "img/stats/testnet.png"

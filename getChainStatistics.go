@@ -43,7 +43,7 @@ func getChainStatistics() error {
 		sbGetLastMasterClaim.CallContract("stake", "GetLastMasterClaim")
 		script := sbGetLastMasterClaim.EndScript()
 		encodedScript := hex.EncodeToString(script)
-		response, err := client.InvokeRawScript(chain, encodedScript)
+		response, err := client.InvokeRawScript(userSettings.ChainName, encodedScript)
 		latestChainStatisticsData.LastMasterClaimTimestamp = response.DecodeResult().AsNumber().Int64()
 		if err != nil {
 			return fmt.Errorf("error fetching last Master claim date: %v", err)
@@ -68,7 +68,7 @@ func getChainStatistics() error {
 		sb.CallContract("stake", "GetClaimMasterCount", time.Unix(nextClaimDate, 0)) // getting eligible SoulMaster count for next claim
 		script = sb.EndScript()
 		encodedScript = hex.EncodeToString(script)
-		response, err = client.InvokeRawScript(chain, encodedScript)
+		response, err = client.InvokeRawScript(userSettings.ChainName, encodedScript)
 
 		latestChainStatisticsData.LastInflationTimeStamp = response.DecodeResults(0).AsNumber().Int64()
 

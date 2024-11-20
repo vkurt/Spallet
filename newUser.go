@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -53,7 +55,7 @@ func showWelcomePage() {
 
 func featuresPage() {
 	featuresHeader := widget.NewLabelWithStyle("Features of Spallet", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-	features := widget.NewRichTextFromMarkdown("1- Bugs, it means if you found a bug its a feature \n\n2- Nicknames and badges based on Staked soul\n\n3- Account migration from manage accounts menu\n\n4- Sending assets between your accounts\n\n5- Sending assets to address book recipients\n\n6-Collecting Master rewards\n\n7- Collecting Crown rewards\n\n8-Eligibility badges\n\n9-Detailed Account information\n\n10- Showing some chain statistics\n\n11- Detailed staking information under hodling tab\n\n12- 15 minute log in time out\n\n also some other things i forget :)\n\n **What we dont have in spallet**\n\n1- Phantasma link\n\n2- Showing Nft pictures and details\n\n3-Burning tokens\n\nsome other things i dont remember\n\n**Planned Features**\n\nI've planned some features for this wallet, like integrating Saturn Dex, but hey, I'm doing this for fun. Feel free to use it as it is. Since it's open-sourced, you can fork it and continue its development or contribute its code if you like.")
+	features := widget.NewRichTextFromMarkdown("1- Bugs, it means if you found a bug its a feature \n\n2- Nicknames and badges based on Staked soul\n\n3- Account migration from manage accounts menu\n\n4- Sending assets between your accounts\n\n5- Sending assets to address book recipients\n\n6-Collecting Master rewards\n\n7- Collecting Crown rewards\n\n8-Eligibility badges\n\n9-Detailed Account information\n\n10- Showing some chain statistics\n\n11- Detailed staking information under hodling tab\n\n12- Adjustable log in time out between 3-120 min\n\n13- Send assets to only known addresses\n\n14- Wallet backup/restore from restore point menu\n\n15- Custom network settings\n\n also some other things i forget :)\n\n **What we dont have in spallet**\n\n1- Phantasma link\n\n2- Showing Nft pictures and details (go SDK limitation and my limited knowledge)\n\n3- Burning tokens\n\nsome other things i dont remember\n\n**Planned Features**\n\nI've planned some features for this wallet, like integrating Saturn Dex, but hey, I'm doing this for fun. Feel free to use it as it is. Since it's open-sourced, you can fork it and continue its development or contribute its code if you like.")
 	features.Wrapping = fyne.TextWrapWord
 	scrollContent := container.NewVScroll(features)
 	continueBttn := widget.NewButton("Continue to wallet setup", func() {
@@ -73,7 +75,7 @@ func showPasswordSetupPage() {
 	passwordEntry.Password = true
 	confirmPasswordEntry := widget.NewPasswordEntry()
 
-	var creds Credentials
+	var creds = Credentials{Wallets: make(map[string]Wallet)}
 
 	var pwdIsValid, cnfrmIsValid bool
 	pwdHeader := widget.NewLabelWithStyle("Set up a Password", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
@@ -139,6 +141,7 @@ func showPasswordSetupPage() {
 
 	pwdSetupLyt.Resize(fyne.NewSize(400, 300))
 	mainWindowGui.SetContent(pwdSetupLyt)
+	mainWindowGui.Canvas().Focus(passwordEntry)
 }
 
 // Function to show Wallet Setup Page
@@ -149,9 +152,233 @@ func showWalletSetupPage(creds Credentials) {
 	importWifButton := widget.NewButton("Import WIF", func() {
 		showImportWifPage(creds)
 	})
+	restorePointBttn := widget.NewButton("Restore Point", func() {
+
+		var restoreDia dialog.Dialog
+
+		// var fullRestoreDia dialog.Dialog
+		var openFolderDia *dialog.FileDialog
+		pwd := ""
+		rstBckBttn := widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() {
+			restoreDia.Hide()
+		})
+		continueBttn := widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() {
+
+			openFolderDia = dialog.NewFolderOpen(func(uri fyne.ListableURI, err error) {
+				if err != nil {
+					dialog.ShowError(err, mainWindowGui)
+					return
+				}
+				if uri == nil {
+					return
+				}
+
+				directory := uri.Path()
+
+				expectedFiles := []string{"addressbook.spallet", "credentials.spallet", "settings.spallet"}
+				notFoundFiles := ""
+				foundFiles := ""
+				pwdEntry := widget.NewPasswordEntry()
+				pwdEntry.OnChanged = func(s string) {
+					pwd = s
+				}
+				pwdEntryFrmItm := widget.NewFormItem("Password", pwdEntry)
+				askPwdDia := dialog.NewForm("Enter Password for this data", "Continue", "Cancel", []*widget.FormItem{
+					pwdEntryFrmItm,
+				}, func(b bool) {
+					if b {
+
+						foundAccounts := 0
+						foundAddress := 0
+						settingsRestored := false
+						for _, fileName := range expectedFiles {
+							filePath := filepath.Join(directory, fileName)
+							if _, err := os.Stat(filePath); err == nil {
+								foundFiles += fmt.Sprintf(fileName + "\n")
+
+								switch fileName {
+								case "credentials.spallet": // restoring unsaved accounts
+									// fmt.Println(pwd)
+									fmt.Println("**************restoring Accounts************")
+									ldCreds, err := loadCredentials(filePath, pwd)
+									if err != nil {
+										dialog.ShowError(err, mainWindowGui)
+										return
+									}
+
+									for _, ldCredsWallet := range ldCreds.Wallets {
+										isSavedWallet := false
+										isSavedName := false
+										// fmt.Println("restore wallet", ldCredsWallet.Name)
+										for _, savedWallet := range creds.Wallets {
+
+											if savedWallet.WIF == ldCredsWallet.WIF {
+												isSavedWallet = true
+
+											}
+											if savedWallet.Name == ldCredsWallet.Name {
+												isSavedName = true
+											}
+
+										}
+
+										if !isSavedWallet && isSavedName {
+											name := fmt.Sprintf("%v...%v", ldCredsWallet.Name[:8], ldCredsWallet.Name[len(ldCredsWallet.Name)-8:len(ldCredsWallet.Name)]) //if user registered same name giving it to a new name
+											walletToAdd := Wallet{
+												Name:    name,
+												Address: ldCredsWallet.Address,
+												WIF:     ldCredsWallet.WIF,
+											}
+											foundAccounts++
+											creds.Wallets[name] = walletToAdd
+
+										} else if !isSavedWallet && !isSavedName {
+											creds.Wallets[ldCredsWallet.Name] = ldCredsWallet
+
+											foundAccounts++
+										}
+
+									}
+									creds.LastSelectedWallet = ldCreds.LastSelectedWallet
+									creds.WalletOrder = ldCreds.WalletOrder
+								case "addressbook.spallet": // restoring unsaved addresses to addressbook
+									fmt.Println("**************restoring adress Book************")
+
+									ldAdrBk, err := loadAddressBook(filePath, pwd)
+									if err != nil {
+										dialog.ShowError(err, mainWindowGui)
+										return
+									}
+									fmt.Println(len(ldAdrBk.Wallets))
+									for _, ldAddrBkAddr := range ldAdrBk.Wallets {
+										isSavedWallet := false
+										isSavedName := false
+										fmt.Println("restore adress", ldAddrBkAddr.Name)
+										for _, savedAddr := range userAddressBook.Wallets {
+
+											if savedAddr.Address == ldAddrBkAddr.Address {
+												isSavedWallet = true
+
+											}
+											if savedAddr.Name == ldAddrBkAddr.Name {
+												isSavedName = true
+											}
+
+										}
+
+										if !isSavedWallet && isSavedName {
+											name := fmt.Sprintf("%v...%v", ldAddrBkAddr.Address[:8], ldAddrBkAddr.Address[len(ldAddrBkAddr.Address)-8:len(ldAddrBkAddr.Address)])
+											walletToAdd := Wallet{
+												Name:    name,
+												Address: ldAddrBkAddr.Address,
+											}
+											foundAddress++
+											userAddressBook.Wallets[name] = walletToAdd
+											userAddressBook.WalletOrder = append(userAddressBook.WalletOrder, name)
+										} else if !isSavedWallet && !isSavedName {
+											userAddressBook.Wallets[ldAddrBkAddr.Name] = ldAddrBkAddr
+											userAddressBook.WalletOrder = append(userAddressBook.WalletOrder, ldAddrBkAddr.Name)
+											foundAddress++
+										}
+
+									}
+
+								case "settings.spallet": //restoring user settings
+									fmt.Println("**************restoring User Settings************")
+									loadSettings(filePath)
+									saveSettings()
+									settingsRestored = true
+
+								}
+
+							} else {
+								if fileName == "credentials.spallet" {
+									dialog.ShowInformation("RESTORE FAILED", "cannot find critical file\nPlease make sure folder you selected includes 'credentials.spallet'", mainWindowGui)
+									return
+								}
+								notFoundFiles += fmt.Sprintf(fileName + "\n")
+							}
+
+						}
+
+						restoreInfo := ""
+						if foundAccounts > 0 {
+							restoreInfo += fmt.Sprintf("Found %v new accounts and added them to your wallet data\n", foundAccounts)
+						} else {
+							restoreInfo += fmt.Sprintln("Cant find any new account")
+						}
+
+						if foundAddress > 0 {
+							restoreInfo += fmt.Sprintf("Found %v new addresses and added them into your address book\n", foundAddress)
+
+						} else {
+							restoreInfo += fmt.Sprintln("Cant find any new address.")
+						}
+
+						if settingsRestored {
+							restoreInfo += fmt.Sprintln("Found settings and applied")
+						} else {
+							restoreInfo += fmt.Sprintln("Cant find settings")
+						}
+
+						restoreInfo += fmt.Sprintf("\nFound Files\n%s\nNot Found Files\n%s", foundFiles, notFoundFiles)
+
+						if foundAccounts > 0 || foundAddress > 0 || settingsRestored {
+							fmt.Println("foundAccounts", foundAccounts)
+							if err := saveCredentials(creds); err != nil {
+								log.Println("Failed to save credentials:", err)
+								dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
+							}
+
+							if err := saveAddressBook(userAddressBook, creds.Password); err != nil {
+								log.Println("Failed to save Address Book:", err)
+								dialog.ShowInformation("Error", "Failed to save Address Book: "+err.Error(), mainWindowGui)
+							}
+							if currentMainDialog != nil {
+								currentMainDialog.Hide()
+							}
+
+							restoreDia.Hide()
+							showUpdatingDialog()
+							dataFetch(creds)
+							mainWindow(creds, regularTokens, nftTokens)
+							closeUpdatingDialog()
+							dialog.ShowInformation("Found new data", restoreInfo, mainWindowGui)
+							startLogoutTicker(15)
+
+						} else {
+
+							dialog.ShowInformation("Restore Failed", fmt.Sprintf("Cant find any data please make sure file names are correct\nFound Files\n%s\nNot Found Files\n%s", foundFiles, notFoundFiles), mainWindowGui)
+
+						}
+
+					}
+				}, mainWindowGui)
+				askPwdDia.Show()
+				mainWindowGui.Canvas().Focus(pwdEntry)
+			}, mainWindowGui)
+			openFolderDia.SetConfirmText("Restore From Here")
+			openFolderDia.Resize(fyne.NewSize(600, 500))
+			openFolderDia.Show()
+
+		})
+
+		restoreExplaination := widget.NewRichTextFromMarkdown("Fully restores data from the backup folder, please select folder contains you want to restore \n\n1- credentials.spallet file adds only unsaved accounts(private keys) to your current accounts. \n\n2- addressbook.spallet adds only unsaved addresses to your address book.\n\n3- settings.spallet overwrites your current settings.\n\n⚠️**You can delete files from back up folder if you dont want them to add**⚠️")
+		restoreExplaination.Wrapping = fyne.TextWrapWord
+
+		bttns := container.NewGridWithColumns(2, rstBckBttn, continueBttn)
+
+		restoreOptDiaLyt := container.NewBorder(nil, bttns, nil, nil, container.NewVBox(restoreExplaination))
+
+		restoreDia = dialog.NewCustomWithoutButtons("Restore information", restoreOptDiaLyt, mainWindowGui)
+		restoreDia.Resize(fyne.NewSize(600, 340))
+		restoreDia.Show()
+
+	})
 
 	walletSetupContent := container.NewVBox(
 		widget.NewLabelWithStyle("Choose a way to add new account", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+		restorePointBttn,
 		generateWalletButton,
 		importWifButton)
 
@@ -189,6 +416,7 @@ func generateNewWalletPage(creds Credentials) {
 			dataFetch(creds)
 			mainWindow(creds, regularTokens, nftTokens)
 			closeUpdatingDialog()
+			startLogoutTicker(15)
 		}
 
 	})
@@ -276,6 +504,7 @@ func showImportWifPage(creds Credentials) {
 			dataFetch(creds)
 			mainWindow(creds, regularTokens, nftTokens)
 			closeUpdatingDialog()
+			startLogoutTicker(15)
 		}
 	})
 	importButton.Disabled()

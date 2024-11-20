@@ -23,6 +23,13 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 	var countdownForSmRw string
 	var countdownForCrwn string
 
+	stakeFeeLimit := userSettings.DefaultGasLimit
+	feeAmount := new(big.Int).Mul(stakeFeeLimit, userSettings.GasPrice)
+	err := checkFeeBalance(feeAmount)
+	if err != nil {
+		dialog.ShowInformation("Low energy", "This account dont have enough Kcal to fill Specky's engines\nPlease check your default fee settings in network settings", mainWindowGui)
+	}
+
 	// Claiming Kcal stuff
 	remainedTimeForKcalGenLabel := widget.NewLabel(fmt.Sprintf("Time until next forging Ritual:\t%v", time.Duration(latestAccountData.RemainedTimeForKcalGen)*time.Second))
 	remainedTimeForKcalGenLabel.Wrapping = fyne.TextWrapWord
@@ -51,11 +58,11 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 				from := keyPair.Address().String()
 				expire := time.Now().UTC().Add(time.Second * 300).Unix()
 				sb := scriptbuilder.BeginScript()
-				sb.AllowGas(from, cryptography.NullAddress().String(), gasPrice, gasLimit)
+				sb.AllowGas(from, cryptography.NullAddress().String(), userSettings.GasPrice, stakeFeeLimit)
 				sb.CallContract("stake", "Claim", from, from)
 				sb.SpendGas(keyPair.Address().String())
 				script := sb.EndScript()
-				tx := blockchain.NewTransaction(network, chain, script, uint32(expire), payload)
+				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
 				tx.Sign(keyPair)
 				txHex := hex.EncodeToString(tx.Bytes())
 				// Start the animation
@@ -144,11 +151,11 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 				from := keyPair.Address().String()
 				expire := time.Now().UTC().Add(time.Second * 300).Unix()
 				sb := scriptbuilder.BeginScript()
-				sb.AllowGas(from, cryptography.NullAddress().String(), gasPrice, gasLimit)
+				sb.AllowGas(from, cryptography.NullAddress().String(), userSettings.GasPrice, stakeFeeLimit)
 				sb.CallContract("stake", "Stake", from, amount.String())
 				sb.SpendGas(keyPair.Address().String())
 				script := sb.EndScript()
-				tx := blockchain.NewTransaction(network, chain, script, uint32(expire), payload)
+				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
 				tx.Sign(keyPair)
 				txHex := hex.EncodeToString(tx.Bytes())
 				// Start the animation
@@ -221,11 +228,11 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 				from := keyPair.Address().String()
 				expire := time.Now().UTC().Add(time.Second * 300).Unix()
 				sb := scriptbuilder.BeginScript()
-				sb.AllowGas(from, cryptography.NullAddress().String(), gasPrice, gasLimit)
+				sb.AllowGas(from, cryptography.NullAddress().String(), userSettings.GasPrice, stakeFeeLimit)
 				sb.CallContract("stake", "Unstake", from, amount.String())
 				sb.SpendGas(keyPair.Address().String())
 				script := sb.EndScript()
-				tx := blockchain.NewTransaction(network, chain, script, uint32(expire), payload)
+				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
 				tx.Sign(keyPair)
 				txHex := hex.EncodeToString(tx.Bytes())
 				// Start the animation
@@ -384,11 +391,11 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 					from := keyPair.Address().String()
 					expire := time.Now().UTC().Add(time.Second * 300).Unix()
 					sb := scriptbuilder.BeginScript()
-					sb.AllowGas(from, cryptography.NullAddress().String(), gasPrice, gasLimit)
+					sb.AllowGas(from, cryptography.NullAddress().String(), userSettings.GasPrice, stakeFeeLimit)
 					sb.CallContract("account", "RegisterName", from, registerNameEntry.Text)
 					sb.SpendGas(keyPair.Address().String())
 					script := sb.EndScript()
-					tx := blockchain.NewTransaction(network, chain, script, uint32(expire), payload)
+					tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
 					tx.Sign(keyPair)
 					txHex := hex.EncodeToString(tx.Bytes())
 					// Start the animation
@@ -434,12 +441,12 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 					from := keyPair.Address().String()
 					expire := time.Now().UTC().Add(time.Second * 300).Unix()
 					sb := scriptbuilder.BeginScript()
-					sb.AllowGas(from, cryptography.NullAddress().String(), gasPrice, gasLimit)
+					sb.AllowGas(from, cryptography.NullAddress().String(), userSettings.GasPrice, stakeFeeLimit)
 					sb.CallContract("account", "UnregisterName", from)
 					sb.CallContract("account", "RegisterName", from, registerNameEntry.Text)
 					sb.SpendGas(keyPair.Address().String())
 					script := sb.EndScript()
-					tx := blockchain.NewTransaction(network, chain, script, uint32(expire), payload)
+					tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
 					tx.Sign(keyPair)
 					txHex := hex.EncodeToString(tx.Bytes())
 					// Start the animation
@@ -505,11 +512,11 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 			from := keyPair.Address().String()
 			expire := time.Now().UTC().Add(time.Second * 300).Unix()
 			sb := scriptbuilder.BeginScript()
-			sb.AllowGas(from, cryptography.NullAddress().String(), gasPrice, gasLimit)
+			sb.AllowGas(from, cryptography.NullAddress().String(), userSettings.GasPrice, stakeFeeLimit)
 			sb.CallContract("stake", "MasterClaim", from)
 			sb.SpendGas(keyPair.Address().String())
 			script := sb.EndScript()
-			tx := blockchain.NewTransaction(network, chain, script, uint32(expire), payload)
+			tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
 			tx.Sign(keyPair)
 			txHex := hex.EncodeToString(tx.Bytes())
 			// Start the animation
@@ -602,11 +609,11 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 			from := keyPair.Address().String()
 			expire := time.Now().UTC().Add(time.Second * 300).Unix()
 			sb := scriptbuilder.BeginScript()
-			sb.AllowGas(from, cryptography.NullAddress().String(), gasPrice, gasLimit)
+			sb.AllowGas(from, cryptography.NullAddress().String(), userSettings.GasPrice, stakeFeeLimit)
 			sb.CallContract("gas", "ApplyInflation", from)
 			sb.SpendGas(keyPair.Address().String())
 			script := sb.EndScript()
-			tx := blockchain.NewTransaction(network, chain, script, uint32(expire), payload)
+			tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
 			tx.Sign(keyPair)
 			txHex := hex.EncodeToString(tx.Bytes())
 			// Start the animation

@@ -55,8 +55,6 @@ type SignatureResult struct {
 	Signature string `json:"signature"`
 }
 
-var explorerLink = string("https://explorer.phantasma.info/en/transaction?id=")
-
 func buildAndShowTxes(address string, pageForFetch, pageSizeForFetch uint, content *fyne.Container) {
 	// Initialize RPC client
 
@@ -231,7 +229,7 @@ func displayTransactions(transactions []TransactionResult, totalPages uint, addr
 			}
 			button := widget.NewButton(fmt.Sprintf("%s - %s - %s - %s -%s", timestamp.Format("15:04:05"), shortTxHash, payload, txState, txType), func(txHash string) func() {
 				return func() {
-					explorerURL := fmt.Sprintf("%s%s", explorerLink, txHash)
+					explorerURL := fmt.Sprintf("%s%s", userSettings.TxExplorerLink, txHash)
 					parsedURL, err := url.Parse(explorerURL)
 					if err != nil {
 						fmt.Println("Failed to parse URL:", err)

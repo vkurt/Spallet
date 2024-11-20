@@ -10,16 +10,13 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/phantasma-io/phantasma-go/pkg/blockchain"
 	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
-	"github.com/phantasma-io/phantasma-go/pkg/util"
 	scriptbuilder "github.com/phantasma-io/phantasma-go/pkg/vm/script_builder"
 )
 
@@ -266,6 +263,8 @@ func manageAccountsDia(creds Credentials) {
 					var migrateDiaI dialog.Dialog
 					var migToKeyDia dialog.Dialog
 
+					migAccFeeLimit := new(big.Int).Set(userSettings.DefaultGasLimit)
+
 					migrateDiaTBackBttn := widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() {
 						migrateDiaT.Hide()
 						migrateDiaI.Show()
@@ -281,6 +280,7 @@ func manageAccountsDia(creds Credentials) {
 							var migToAccAddr string
 							var migToAccName string
 							var selectableAcc []string
+
 							migToAccSep1 := widget.NewSeparator()
 							migToAccSep2 := widget.NewSeparator()
 							migToAccSep3 := widget.NewSeparator()
@@ -304,73 +304,24 @@ func manageAccountsDia(creds Credentials) {
 
 									expire := time.Now().UTC().Add(time.Second * 300).Unix()
 									sb := scriptbuilder.BeginScript()
-									sb.AllowGas(keyPair.Address().String(), cryptography.NullAddress().String(), gasPrice, gasLimit)
+									sb.AllowGas(keyPair.Address().String(), cryptography.NullAddress().String(), userSettings.GasPrice, migAccFeeLimit)
 									sb.CallContract("account", "migrate", keyPair.Address().String(), migToAccAddr)
 									sb.SpendGas(keyPair.Address().String())
 									script := sb.EndScript()
 
-									tx := blockchain.NewTransaction(network, chain, script, uint32(expire), []byte("test"))
+									tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("test"))
 									tx.Sign(keyPair)
 									txHex := hex.EncodeToString(tx.Bytes())
-									fmt.Println("*****Tx: \n" + txHex)
+									// fmt.Println("*****Tx: \n" + txHex)
 
-									// Create a container to hold the animation images
-									animationContainer := container.New(layout.NewCenterLayout())
-									images := []string{
-										"img/anim/send/1.png", "img/anim/send/2.png", "img/anim/send/3.png",
-										"img/anim/send/4.png", "img/anim/send/5.png", "img/anim/send/6.png",
-										"img/anim/send/7.png", "img/anim/send/8.png", "img/anim/send/9.png", "img/anim/send/10.png",
-									}
-									imageIndex := 0
-
-									// Function to update the image
-									updateImage := func() {
-										img := loadImage(images[imageIndex])
-										imageIndex = (imageIndex + 1) % len(images)
-										imageCanvas := canvas.NewImageFromImage(img)
-										imageCanvas.FillMode = canvas.ImageFillContain
-										imageCanvas.SetMinSize(fyne.NewSize(400, 300))
-										animationContainer.Objects = []fyne.CanvasObject{imageCanvas}
-										animationContainer.Refresh()
-									}
-
-									// Load and show the first image
-									img := loadImage(images[imageIndex])
-									imageCanvas := canvas.NewImageFromImage(img)
-									imageCanvas.FillMode = canvas.ImageFillContain
-									imageCanvas.SetMinSize(fyne.NewSize(200, 100))
-									animationContainer.Objects = []fyne.CanvasObject{imageCanvas}
-									animationBox := container.NewVBox(animationContainer)
-									animationBox.Resize(fyne.NewSize(400, 300)) // Set the desired size
-
-									d := dialog.NewCustomWithoutButtons("Specky is delivering wait a bit...", animationBox, mainWindowGui)
-
-									d.Show()
 									// Start the animation
-									closed := false
-									go func() {
-										ticker := time.NewTicker(125 * time.Millisecond)
-										defer ticker.Stop()
-										for range ticker.C {
-											if closed {
-												return
-											}
-											updateImage()
-										}
-									}()
+									startAnimation("send", "Specky is delivering wait a bit...")
 
-									go func() {
-										txHash, err := client.SendRawTransaction(txHex)
-										if err != nil || util.ErrorDetect(txHash) {
+									// Here, you can use stopChan if needed later, for example:
+									// defer close(stopChan) when you need to ensure it gets closed properly.
 
-											showTxResultDialog(fmt.Sprintf("Transaction failed: %v", err), creds)
-										} else {
-											creds.LastSelectedWallet = wallet.Name
-											waitForTxResult(txHash, creds)
-										}
-									}()
-									currentMainDialog.SetOnClosed(func() { closed = true })
-
+									// Send the transaction
+									SendTransaction(txHex, creds, handleSuccess, handleFailure)
 								})
 
 								migToAccBckBttn := widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() {
@@ -385,23 +336,23 @@ func manageAccountsDia(creds Credentials) {
 									migrateDiaI.Hide()
 								})
 
-								gasLimitFloat, _ := gasLimit.Float64()
-								gasSlider := widget.NewSlider(10000, 100000)
+								gasLimitFloat, _ := userSettings.DefaultGasLimit.Float64()
+								gasSlider := widget.NewSlider(userSettings.GasLimitSliderMin, userSettings.GasLimitSliderMax)
 								gasSlider.Value = gasLimitFloat
 
 								warning := binding.NewString()
 								warning.Set("You have enough Kcal to fill Specky's engines")
 								warningLabel := widget.NewLabelWithData(warning)
 								warningLabel.Bind(warning)
-								feeAmount := new(big.Int).Mul(gasLimit, gasPrice)
+								feeAmount := new(big.Int).Mul(migAccFeeLimit, userSettings.GasPrice)
 								feeErr := checkFeeBalance(feeAmount)
 								if feeErr != nil {
 									warning.Set(feeErr.Error())
 									migToAccConfirmBttn.Disable()
 								}
 								gasSlider.OnChangeEnded = func(f float64) {
-									gasLimit.SetInt64(int64(f))
-									adjustedFeeAmount := new(big.Int).Mul(gasLimit, gasPrice)
+									migAccFeeLimit.SetInt64(int64(f))
+									adjustedFeeAmount := new(big.Int).Mul(migAccFeeLimit, userSettings.GasPrice)
 									feeErr := checkFeeBalance(adjustedFeeAmount)
 									if feeErr != nil {
 										warning.Set(feeErr.Error())
@@ -524,73 +475,24 @@ func manageAccountsDia(creds Credentials) {
 
 								expire := time.Now().UTC().Add(time.Second * 300).Unix()
 								sb := scriptbuilder.BeginScript()
-								sb.AllowGas(keyPair.Address().String(), cryptography.NullAddress().String(), gasPrice, gasLimit)
+								sb.AllowGas(keyPair.Address().String(), cryptography.NullAddress().String(), userSettings.GasPrice, migAccFeeLimit)
 								sb.CallContract("account", "migrate", keyPair.Address().String(), genAddress)
 								sb.SpendGas(keyPair.Address().String())
 								script := sb.EndScript()
 
-								tx := blockchain.NewTransaction(network, chain, script, uint32(expire), []byte("test"))
+								tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("test"))
 								tx.Sign(keyPair)
 								txHex := hex.EncodeToString(tx.Bytes())
-								fmt.Println("*****Tx: \n" + txHex)
+								// fmt.Println("*****Tx: \n" + txHex)
 
-								// Create a container to hold the animation images
-								animationContainer := container.New(layout.NewCenterLayout())
-								images := []string{
-									"img/anim/send/1.png", "img/anim/send/2.png", "img/anim/send/3.png",
-									"img/anim/send/4.png", "img/anim/send/5.png", "img/anim/send/6.png",
-									"img/anim/send/7.png", "img/anim/send/8.png", "img/anim/send/9.png", "img/anim/send/10.png",
-								}
-								imageIndex := 0
-
-								// Function to update the image
-								updateImage := func() {
-									img := loadImage(images[imageIndex])
-									imageIndex = (imageIndex + 1) % len(images)
-									imageCanvas := canvas.NewImageFromImage(img)
-									imageCanvas.FillMode = canvas.ImageFillContain
-									imageCanvas.SetMinSize(fyne.NewSize(400, 300))
-									animationContainer.Objects = []fyne.CanvasObject{imageCanvas}
-									animationContainer.Refresh()
-								}
-
-								// Load and show the first image
-								img := loadImage(images[imageIndex])
-								imageCanvas := canvas.NewImageFromImage(img)
-								imageCanvas.FillMode = canvas.ImageFillContain
-								imageCanvas.SetMinSize(fyne.NewSize(200, 100))
-								animationContainer.Objects = []fyne.CanvasObject{imageCanvas}
-								animationBox := container.NewVBox(animationContainer)
-								animationBox.Resize(fyne.NewSize(400, 300)) // Set the desired size
-
-								d := dialog.NewCustomWithoutButtons("Specky is delivering wait a bit...", animationBox, mainWindowGui)
-
-								d.Show()
 								// Start the animation
-								closed := false
-								go func() {
-									ticker := time.NewTicker(125 * time.Millisecond)
-									defer ticker.Stop()
-									for range ticker.C {
-										if closed {
-											return
-										}
-										updateImage()
-									}
-								}()
+								startAnimation("send", "Specky is delivering wait a bit...")
 
-								go func() {
-									txHash, err := client.SendRawTransaction(txHex)
-									if err != nil || util.ErrorDetect(txHash) {
+								// Here, you can use stopChan if needed later, for example:
+								// defer close(stopChan) when you need to ensure it gets closed properly.
 
-										showTxResultDialog(fmt.Sprintf("Transaction failed: %v", err), creds)
-									} else {
-										creds.LastSelectedWallet = wallet.Name
-										waitForTxResult(txHash, creds)
-									}
-								}()
-								currentMainDialog.SetOnClosed(func() { closed = true })
-
+								// Send the transaction
+								SendTransaction(txHex, creds, handleSuccess, handleFailure)
 							})
 
 							migToGenBckBttn := widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() {
@@ -605,16 +507,16 @@ func manageAccountsDia(creds Credentials) {
 								migrateDiaI.Hide()
 							})
 
-							gasLimitFloat, _ := gasLimit.Float64()
+							gasLimitFloat, _ := migAccFeeLimit.Float64()
 							gasSliderBind := binding.BindFloat(&gasLimitFloat)
-							gasSlider := widget.NewSliderWithData(10000, 100000, gasSliderBind)
+							gasSlider := widget.NewSliderWithData(userSettings.GasLimitSliderMin, userSettings.GasLimitSliderMax, gasSliderBind)
 							gasSlider.Value = gasLimitFloat
 
 							warning := binding.NewString()
 							warning.Set("You have enough Kcal to fill Specky's engines")
 							warningLabel := widget.NewLabelWithData(warning)
 							warningLabel.Bind(warning)
-							feeAmount := new(big.Int).Mul(gasLimit, gasPrice)
+							feeAmount := new(big.Int).Mul(migAccFeeLimit, userSettings.GasPrice)
 							feeErr := checkFeeBalance(feeAmount)
 							if feeErr != nil {
 								warning.Set(feeErr.Error())
@@ -629,8 +531,8 @@ func manageAccountsDia(creds Credentials) {
 								}
 							}
 							gasSlider.OnChangeEnded = func(f float64) {
-								gasLimit.SetInt64(int64(f))
-								adjustedFeeAmount := new(big.Int).Mul(gasLimit, gasPrice)
+								migAccFeeLimit.SetInt64(int64(f))
+								adjustedFeeAmount := new(big.Int).Mul(migAccFeeLimit, userSettings.GasPrice)
 								feeErr := checkFeeBalance(adjustedFeeAmount)
 								if feeErr != nil {
 									warning.Set(feeErr.Error())
@@ -757,73 +659,24 @@ func manageAccountsDia(creds Credentials) {
 
 									expire := time.Now().UTC().Add(time.Second * 300).Unix()
 									sb := scriptbuilder.BeginScript()
-									sb.AllowGas(keyPair.Address().String(), cryptography.NullAddress().String(), gasPrice, gasLimit)
+									sb.AllowGas(keyPair.Address().String(), cryptography.NullAddress().String(), userSettings.GasPrice, migAccFeeLimit)
 									sb.CallContract("account", "migrate", keyPair.Address().String(), migToKeyAddress)
 									sb.SpendGas(keyPair.Address().String())
 									script := sb.EndScript()
 
-									tx := blockchain.NewTransaction(network, chain, script, uint32(expire), []byte("test"))
+									tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("test"))
 									tx.Sign(keyPair)
 									txHex := hex.EncodeToString(tx.Bytes())
-									fmt.Println("*****Tx: \n" + txHex)
+									// fmt.Println("*****Tx: \n" + txHex)
 
-									// Create a container to hold the animation images
-									animationContainer := container.New(layout.NewCenterLayout())
-									images := []string{
-										"img/anim/send/1.png", "img/anim/send/2.png", "img/anim/send/3.png",
-										"img/anim/send/4.png", "img/anim/send/5.png", "img/anim/send/6.png",
-										"img/anim/send/7.png", "img/anim/send/8.png", "img/anim/send/9.png", "img/anim/send/10.png",
-									}
-									imageIndex := 0
-
-									// Function to update the image
-									updateImage := func() {
-										img := loadImage(images[imageIndex])
-										imageIndex = (imageIndex + 1) % len(images)
-										imageCanvas := canvas.NewImageFromImage(img)
-										imageCanvas.FillMode = canvas.ImageFillContain
-										imageCanvas.SetMinSize(fyne.NewSize(400, 300))
-										animationContainer.Objects = []fyne.CanvasObject{imageCanvas}
-										animationContainer.Refresh()
-									}
-
-									// Load and show the first image
-									img := loadImage(images[imageIndex])
-									imageCanvas := canvas.NewImageFromImage(img)
-									imageCanvas.FillMode = canvas.ImageFillContain
-									imageCanvas.SetMinSize(fyne.NewSize(200, 100))
-									animationContainer.Objects = []fyne.CanvasObject{imageCanvas}
-									animationBox := container.NewVBox(animationContainer)
-									animationBox.Resize(fyne.NewSize(400, 300)) // Set the desired size
-
-									d := dialog.NewCustomWithoutButtons("Specky is delivering wait a bit...", animationBox, mainWindowGui)
-
-									d.Show()
 									// Start the animation
-									closed := false
-									go func() {
-										ticker := time.NewTicker(125 * time.Millisecond)
-										defer ticker.Stop()
-										for range ticker.C {
-											if closed {
-												return
-											}
-											updateImage()
-										}
-									}()
+									startAnimation("send", "Specky is delivering wait a bit...")
 
-									go func() {
-										txHash, err := client.SendRawTransaction(txHex)
-										if err != nil || util.ErrorDetect(txHash) {
+									// Here, you can use stopChan if needed later, for example:
+									// defer close(stopChan) when you need to ensure it gets closed properly.
 
-											showTxResultDialog(fmt.Sprintf("Transaction failed: %v", err), creds)
-										} else {
-											creds.LastSelectedWallet = wallet.Name
-											waitForTxResult(txHash, creds)
-										}
-									}()
-									currentMainDialog.SetOnClosed(func() { closed = true })
-
+									// Send the transaction
+									SendTransaction(txHex, creds, handleSuccess, handleFailure)
 								})
 
 								migToKeyBckBttn := widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() {
@@ -838,23 +691,23 @@ func manageAccountsDia(creds Credentials) {
 									migrateDiaI.Hide()
 								})
 
-								gasLimitFloat, _ := gasLimit.Float64()
-								gasSlider := widget.NewSlider(10000, 100000)
+								gasLimitFloat, _ := migAccFeeLimit.Float64()
+								gasSlider := widget.NewSlider(userSettings.GasLimitSliderMin, userSettings.GasLimitSliderMax)
 								gasSlider.Value = gasLimitFloat
 
 								warning := binding.NewString()
 								warning.Set("You have enough Kcal to fill Specky's engines")
 								warningLabel := widget.NewLabelWithData(warning)
 								warningLabel.Bind(warning)
-								feeAmount := new(big.Int).Mul(gasLimit, gasPrice)
+								feeAmount := new(big.Int).Mul(migAccFeeLimit, userSettings.GasPrice)
 								feeErr := checkFeeBalance(feeAmount)
 								if feeErr != nil {
 									warning.Set(feeErr.Error())
 									migToKeyConfirmBttn.Disable()
 								}
 								gasSlider.OnChangeEnded = func(f float64) {
-									gasLimit.SetInt64(int64(f))
-									adjustedFeeAmount := new(big.Int).Mul(gasLimit, gasPrice)
+									migAccFeeLimit.SetInt64(int64(f))
+									adjustedFeeAmount := new(big.Int).Mul(migAccFeeLimit, userSettings.GasPrice)
 									feeErr := checkFeeBalance(adjustedFeeAmount)
 									if feeErr != nil {
 										warning.Set(feeErr.Error())

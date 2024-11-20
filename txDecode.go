@@ -26,9 +26,9 @@ func hexToASCII(hexStr string) string {
 	return result
 }
 
-func decodeData(data string) {
-	// Your hex data
-	// Convert hex data to readable text
-	readableText := hexToASCII(data)
-	fmt.Println(readableText)
-}
+// func decodeData(data string) {
+// 	// Your hex data
+// 	// Convert hex data to readable text
+// 	readableText := hexToASCII(data)
+// 	fmt.Println(readableText)
+// }

@@ -1,5 +1,5 @@
 # Ignore credentials and secret files
-credentials.json
+*.spallet
 *.key
 *.json
 

@@ -4,7 +4,6 @@ go 1.23.2
 
 require (
 	fyne.io/fyne/v2 v2.5.2
-	github.com/disintegration/imaging v1.6.2
 	github.com/phantasma-io/phantasma-go v0.0.0-20240803171736-69b7df5a9bc8
 
 )

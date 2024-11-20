@@ -99,6 +99,13 @@ func openSecurityDia(creds Credentials) {
 						dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
 						return
 					}
+
+					if err := saveAddressBook(userAddressBook, newPwdCnfrm.Text); err != nil {
+						log.Println("Failed to save address book:", err)
+						dialog.ShowInformation("Error", "Failed to save address book: "+err.Error(), mainWindowGui)
+						return
+					}
+
 					userSettings.AskPwd = askPwd
 					userSettings.LgnTmeOut = lgnTmeOutMnt
 					userSettings.SendOnly = sendOnlyKnown
@@ -319,7 +326,7 @@ func askPwdDia(askPwd bool, pwd string, mainWindow fyne.Window, callback func(bo
 				callback(false)
 			}, mainWindow)
 		currentMainDialog = form
-		currentMainDialog.Resize(fyne.NewSize(300, 200))
+		currentMainDialog.Resize(fyne.NewSize(368, 207))
 		currentMainDialog.Show()
 		mainWindow.Canvas().Focus(pwdEntry)
 	} else {

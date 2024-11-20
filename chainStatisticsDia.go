@@ -8,10 +8,12 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
-func buildAndShowChainStatistics(walletDetails *fyne.Container) {
+func buildAndShowChainStatistics() {
 
 	soulSupplyRawBigint := StringToBigInt(latestChainStatisticsData.SoulData.CurrentSupply)
 	kcalSupplyRawBigint := StringToBigInt(latestChainStatisticsData.KcalData.CurrentSupply)
@@ -55,13 +57,18 @@ func buildAndShowChainStatistics(walletDetails *fyne.Container) {
 		latestChainStatisticsData.EstSMReward, sparkGenRate, kcalProdRate, formatBalance(*latestChainStatisticsData.TotalStakedSoul, soulDecimals), stakingRatio, latestChainStatisticsData.SMApr, latestChainStatisticsData.TotalMaster, latestChainStatisticsData.EligibleMaster, latestChainStatisticsData.CrownData.CurrentSupply, time.Unix(latestChainStatisticsData.NextInfTimeStamp, 0).Format("02-01-2006 15:04"), maxFullyBoostedSoulmasterFloat64, formatBalance(*estimatedBoostedDailyKcalGenerationInt, kcalDecimals), boostedStakedSupplyRatio, annualKcalSupplyGrowthRate)
 
 	statistics := container.NewVBox(
-		widget.NewLabelWithStyle("Chain Statistics For "+network, fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+
 		widget.NewLabelWithStyle("Main Tokens info", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		widget.NewLabel(mainTokenInfo),
 		widget.NewLabelWithStyle("Staking Info", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		widget.NewLabel(stakingInfo),
 	)
+	bckBttn := widget.NewButtonWithIcon("", theme.WindowCloseIcon(), func() { currentMainDialog.Hide() })
+	chnStcsCntnt := container.NewVScroll(statistics)
+	chnStcsLyt := container.NewBorder(nil, bckBttn, nil, nil, chnStcsCntnt)
+	currentMainDialog = dialog.NewCustomWithoutButtons(fmt.Sprintf("Chain Statistics For "+userSettings.NetworkName), chnStcsLyt, mainWindowGui)
+	currentMainDialog.Resize(fyne.NewSize(chnStcsCntnt.MinSize().Width, mainWindowGui.Canvas().Size().Height-50))
+	closeUpdatingDialog()
+	currentMainDialog.Show()
 
-	walletDetails.Objects = []fyne.CanvasObject{statistics}
-	walletDetails.Refresh()
 }

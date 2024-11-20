@@ -13,7 +13,6 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/phantasma-io/phantasma-go/pkg/rpc"
 	"github.com/phantasma-io/phantasma-go/pkg/rpc/response"
 )
 
@@ -50,11 +49,6 @@ var historyTab *fyne.Container
 var accBadges *fyne.Container
 var mainWindowGui fyne.Window
 
-var gasLimit = big.NewInt(21000)
-var gasPrice = big.NewInt(100000)
-var client = rpc.NewRPCMainnet()
-var network = "mainnet"
-var chain = "main"
 var minSoulStake = big.NewInt(100000000)
 var soulDecimals = 8
 var kcalDecimals = 10
@@ -69,13 +63,11 @@ func main() {
 	a := app.New()
 	mainWindowGui = a.NewWindow("Spallet")
 	mainWindowGui.Resize(fyne.NewSize(800, 600))
-	loadSettings("data/essential/settings.spallet") // Load settings at startup
-	getChainStatistics()
+
 	firstTime := !fileExists("data/essential/credentials.spallet")
 
 	if firstTime {
 		showWelcomePage()
-		startLogoutTicker(userSettings.LgnTmeOut)
 
 	} else {
 
@@ -179,6 +171,8 @@ func showExistingUserLogin() {
 				userAddressBook = ldAddrBk
 			}
 			showUpdatingDialog()
+			loadSettings("data/essential/settings.spallet") // Load settings at startup
+			getChainStatistics()
 			var foundWalletNumber = 0
 			var listedWallets = len(creds.WalletOrder)
 			for _, found := range creds.Wallets { //check if there is a unvisible wallet we have
@@ -288,13 +282,13 @@ func mainWindow(creds Credentials, regularTokens []fyne.CanvasObject, nftTokens 
 		manageAccountsDia(creds)
 	})
 	networkButton := widget.NewButton("Network", func() {
-		showNetworkSettingsPage(walletDetails, creds)
+		showNetworkSettingsPage(creds)
 	})
 	chainStatsButton := widget.NewButton("Chain Statistics", func() {
 		showUpdatingDialog()
 		getChainStatistics() // Assume this updates the walletDetails with chain stats
-		buildAndShowChainStatistics(walletDetails)
-		closeUpdatingDialog()
+		buildAndShowChainStatistics()
+
 	})
 	balancesButton := widget.NewButton("Balances", func() {
 		showUpdatingDialog()

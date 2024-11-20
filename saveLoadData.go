@@ -4,28 +4,49 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"path/filepath"
 
-	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/dialog"
 	"github.com/phantasma-io/phantasma-go/pkg/rpc"
 )
 
 type WalletSettings struct {
-	Network   string `json:"network"`
-	CustomRPC string `json:"custom_rpc"`
-	Chain     string `json:"chain"`
-	AskPwd    bool   `json:"ask_pwd"`
-	LgnTmeOut int    `json:"lgn_tmeout"`
-	SendOnly  bool   `json:"send_only"`
+	AskPwd            bool     `json:"ask_pwd"` // security settings
+	LgnTmeOut         int      `json:"lgn_tmeout"`
+	SendOnly          bool     `json:"send_only"`
+	NetworkName       string   `json:"network"` //  network settings
+	ChainName         string   `json:"chain"`
+	DefaultGasLimit   *big.Int `json:"default_gas_limit"`
+	GasLimitSliderMax float64  `json:"gas_limit_slider_max"`
+	GasLimitSliderMin float64  `json:"gas_limit_slider_min"`
+	GasPrice          *big.Int `json:"gas_price"`
+	TxExplorerLink    string   `json:"tx_explorer_link"`
+	AccExplorerLink   string   `json:"acc_explorer_link"`
+	RpcType           string   `json:"rpc_type"` //tried rpc.PhantasmaRpc but not worked
+	CustomRpcLink     string   `json:"custom_rpc_link"`
+	NetworkType       string   `json:"network_type"`
 }
 
+var client rpc.PhantasmaRPC
 var userSettings WalletSettings
-var defaultSettings = WalletSettings{Network: "Mainnet",
-	Chain:     "main",
-	AskPwd:    true,
-	LgnTmeOut: 15,
-	SendOnly:  false}
+
+var defaultSettings = WalletSettings{
+	AskPwd:            true, //default security settings
+	LgnTmeOut:         15,
+	SendOnly:          false,
+	NetworkName:       "mainnet", // default network settings
+	ChainName:         "main",
+	DefaultGasLimit:   big.NewInt(21000),
+	GasLimitSliderMax: 100000,
+	GasLimitSliderMin: 10000,
+	GasPrice:          big.NewInt(100000),
+	TxExplorerLink:    "https://explorer.phantasma.info/en/transaction?id=",
+	AccExplorerLink:   "https://explorer.phantasma.info/en/address?id=",
+	RpcType:           "mainnet",
+	NetworkType:       "Mainnet",
+}
 
 func saveAddressBook(adrBk addressBook, pwd string) error {
 	filename := "data/essential/" + "addressbook.spallet"
@@ -45,7 +66,8 @@ func loadAddressBook(path, rawPassword string) (addressBook, error) {
 
 	encryptedData, err := os.ReadFile(path)
 	if err != nil {
-		return addressBook{Wallets: map[string]Wallet{}}, err
+		saveAddressBook(userAddressBook, rawPassword)
+		return addressBook{Wallets: map[string]Wallet{}}, fmt.Errorf("cant find adddressbook data and saved an empty one:\n%v", err)
 	}
 	decryptedData, err := decrypt(string(encryptedData), rawPassword)
 	if err != nil {
@@ -90,8 +112,7 @@ func loadCredentials(path, rawPassword string) (Credentials, error) {
 	return creds, nil
 }
 
-// Helper function to load image resources
-
+// checks if file exists
 func fileExists(filePath string) bool {
 
 	info, err := os.Stat(filePath)
@@ -106,33 +127,26 @@ func loadSettings(path string) {
 	if err != nil {
 		// File doesn't exist, create with default settings
 		userSettings = defaultSettings
+		applySettings()
 		err = saveSettings()
 		if err != nil {
-			fyne.CurrentApp().SendNotification(&fyne.Notification{
-				Title:   "Error",
-				Content: "Failed to create default settings file.",
-			})
+			dialog.ShowError(fmt.Errorf("failed to save default settings\n%v", err), mainWindowGui)
 		}
-		client = rpc.NewRPCMainnet()
+
 		return
 	}
 	defer file.Close()
 
 	err = json.NewDecoder(file).Decode(&userSettings)
-	if err != nil || userSettings.Network == "" || userSettings.Chain == "" {
-		// Failed to decode or settings are empty, create with default settings
+	if err != nil {
 		userSettings = defaultSettings
 		err = saveSettings()
 		if err != nil {
-			fyne.CurrentApp().SendNotification(&fyne.Notification{
-				Title:   "Error",
-				Content: "Failed to create default settings file.",
-			})
+			dialog.ShowError(fmt.Errorf("failed to load settings and saved default\n%v", err), mainWindowGui)
 		}
-		client = rpc.NewRPCMainnet()
-	} else {
-		applySettings()
 	}
+	applySettings()
+
 }
 
 // Save settings to file
@@ -153,24 +167,21 @@ func saveSettings() error {
 }
 
 func applySettings() {
-	switch userSettings.Network {
-	case "Mainnet":
+	switch userSettings.RpcType {
+	case "mainnet":
 		client = rpc.NewRPCMainnet()
-		network = "mainnet"
+
 		fmt.Println("Applied network settings: Mainnet")
-	case "Testnet":
+	case "testnet":
 		client = rpc.NewRPCTestnet()
-		network = "testnet"
+
 		fmt.Println("Applied network settings: Testnet")
-	case "Custom":
-		client = rpc.NewRPC(userSettings.CustomRPC)
-		network = "custom"
-		fmt.Println("Applied network settings: Custom RPC -", userSettings.CustomRPC)
+	case "custom":
+		client = rpc.NewRPC(userSettings.CustomRpcLink)
+
+		fmt.Println("Applied network settings: Custom RPC -", userSettings.CustomRpcLink)
 	}
-	chain = userSettings.Chain
-	fmt.Println("Applied chain settings:", chain, network, client)
-	askPwd = userSettings.AskPwd
-	lgnTmeOutMnt = userSettings.LgnTmeOut
+
 }
 
 func backupCopyFolder(source, dest string) error {

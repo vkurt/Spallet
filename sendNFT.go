@@ -18,7 +18,7 @@ import (
 	scriptbuilder "github.com/phantasma-io/phantasma-go/pkg/vm/script_builder"
 )
 
-func sendNFTConfirm(WIF string, nftsToSend map[string][]string, to string, name string, creds Credentials) error {
+func sendNFTConfirm(WIF string, nftsToSend map[string][]string, to string, name string, creds Credentials, nftFeeLimit *big.Int) error {
 	// Construct the confirmation message
 	var nftDetails string
 	var confirmMessage string
@@ -37,7 +37,7 @@ func sendNFTConfirm(WIF string, nftsToSend map[string][]string, to string, name 
 	dialog.ShowConfirm("Confirm Transaction", confirmMessage, func(confirmed bool) {
 		if confirmed {
 			// Proceed with transaction if user confirmed
-			go sendNFTTransaction(WIF, nftsToSend, to, creds)
+			go sendNFTTransaction(WIF, nftsToSend, to, creds, nftFeeLimit)
 		} else {
 			// Handle abort action
 
@@ -47,7 +47,7 @@ func sendNFTConfirm(WIF string, nftsToSend map[string][]string, to string, name 
 	return nil
 }
 
-func sendNFTTransaction(WIF string, nftsToSend map[string][]string, to string, creds Credentials) {
+func sendNFTTransaction(WIF string, nftsToSend map[string][]string, to string, creds Credentials, nftFeeLimit *big.Int) {
 	keyPair, err := cryptography.FromWIF(WIF)
 	if err != nil {
 		fyne.CurrentApp().SendNotification(&fyne.Notification{
@@ -61,17 +61,17 @@ func sendNFTTransaction(WIF string, nftsToSend map[string][]string, to string, c
 	expire := time.Now().UTC().Add(time.Second * 300).Unix()
 	fmt.Println("expiration time: ", expire)
 	sb := scriptbuilder.BeginScript()
-	sb.AllowGas(from, cryptography.NullAddress().String(), gasPrice, gasLimit)
+	sb.AllowGas(from, cryptography.NullAddress().String(), userSettings.GasPrice, nftFeeLimit)
 	for id, symbol := range nftsToSend {
 		fmt.Printf("Sending nft : %v %v\n", symbol[0], id)
 		sb.CallInterop("Runtime.TransferToken", from, to, symbol[0], id)
 	}
 	sb.SpendGas(keyPair.Address().String())
 	script := sb.EndScript()
-	tx := blockchain.NewTransaction(network, chain, script, uint32(expire), payload)
+	tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
 	tx.Sign(keyPair)
 	txHex := hex.EncodeToString(tx.Bytes())
-	fmt.Println("Tx: " + txHex)
+	// fmt.Println("Tx: " + txHex)
 
 	// Start the animation
 	startAnimation("send", "Specky is delivering wait a bit...")
@@ -85,6 +85,8 @@ func sendNFTTransaction(WIF string, nftsToSend map[string][]string, to string, c
 
 func showSendNFTDia(symbol string, creds Credentials) {
 	// Usage
+
+	nftFeeLimit := new(big.Int).Set(userSettings.DefaultGasLimit)
 	askPwdDia(askPwd, creds.Password, mainWindowGui, func(correct bool) {
 		fmt.Println("result", correct)
 		if !correct {
@@ -157,8 +159,8 @@ func showSendNFTDia(symbol string, creds Credentials) {
 		nftSelections := container.NewGridWithColumns(4)
 		var selectedNFTs = make(map[string][]string)
 
-		gasLimitFloat, _ := gasLimit.Float64()
-		gasSlider := widget.NewSlider(10000, 100000)
+		gasLimitFloat, _ := userSettings.DefaultGasLimit.Float64()
+		gasSlider := widget.NewSlider(userSettings.GasLimitSliderMin, userSettings.GasLimitSliderMax)
 		gasSlider.Value = gasLimitFloat
 		gasSliderLabel := widget.NewLabelWithStyle("Specky's energy limit", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 		warning := binding.NewString()
@@ -184,11 +186,11 @@ func showSendNFTDia(symbol string, creds Credentials) {
 				recipient.Text = nameToAddress
 			}
 
-			sendNFTConfirm(creds.Wallets[creds.LastSelectedWallet].WIF, selectedNFTs, recipient.Text, name, creds)
+			sendNFTConfirm(creds.Wallets[creds.LastSelectedWallet].WIF, selectedNFTs, recipient.Text, name, creds, nftFeeLimit)
 		})
 		sendButton.Disable()
 		updateSendButtonState := func() {
-			feeAmount := new(big.Int).Mul(gasLimit, gasPrice)
+			feeAmount := new(big.Int).Mul(nftFeeLimit, userSettings.GasPrice)
 			err := checkFeeBalance(feeAmount) // Call the function with parentheses
 			fmt.Printf("Update Submit Button: Amount: %v, Error: %v\n", amount, err)
 			if err != nil {
@@ -269,7 +271,7 @@ func showSendNFTDia(symbol string, creds Credentials) {
 
 		}
 		gasSlider.OnChanged = func(value float64) {
-			gasLimit.SetInt64(int64(value))
+			nftFeeLimit.SetInt64(int64(value))
 			updateSendButtonState()
 		}
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"image"
 	"os"
 	"runtime"
 	"sync"
@@ -13,7 +12,6 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
-	"github.com/disintegration/imaging"
 )
 
 var (
@@ -187,15 +185,15 @@ func updateAnimImageResource(imageCanvas *canvas.Image, imagePath string) {
 	imageCanvas.Refresh()
 }
 
-func loadImage(path string) image.Image {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil
-	}
-	defer file.Close()
-	img, err := imaging.Decode(file)
-	if err != nil {
-		return nil
-	}
-	return img
-}
+// func loadImage(path string) image.Image {
+// 	file, err := os.Open(path)
+// 	if err != nil {
+// 		return nil
+// 	}
+// 	defer file.Close()
+// 	img, err := imaging.Decode(file)
+// 	if err != nil {
+// 		return nil
+// 	}
+// 	return img
+// }
