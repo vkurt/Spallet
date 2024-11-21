@@ -82,7 +82,7 @@ func openSecurityDia(creds Credentials) {
 			var tmeOutValid, pwdValid, pwdCnfmValid bool
 			saveBttn := widget.NewButtonWithIcon("", theme.ConfirmIcon(), func() {
 				lgnTmeOutMnt, _ = strconv.Atoi(lgnTmeOut.Text)
-				if len(newPwdCnfrm.Text) < 6 {
+				if len(newPwdCnfrm.Text) < 6 || len(newPwd.Text) < 6 || newPwdCnfrm.Text != newPwd.Text {
 					userSettings.AskPwd = askPwd
 					userSettings.LgnTmeOut = lgnTmeOutMnt
 					userSettings.SendOnly = sendOnlyKnown
@@ -92,7 +92,7 @@ func openSecurityDia(creds Credentials) {
 						return
 					}
 					currentMainDialog.Hide()
-					dialog.ShowInformation("Settings saved", "Password not updated and settings saved", mainWindowGui)
+					dialog.ShowInformation("Settings saved", "Password not Changed\nSettings saved", mainWindowGui)
 				} else {
 					creds.Password = newPwdCnfrm.Text
 					if err := saveCredentials(creds); err != nil {
@@ -117,7 +117,7 @@ func openSecurityDia(creds Credentials) {
 					}
 					mainWindow(creds, regularTokens, nftTokens)
 					currentMainDialog.Hide()
-					dialog.ShowInformation("Settings saved", "Password updated and settings saved", mainWindowGui)
+					dialog.ShowInformation("Settings saved", "Password Changed\nSettings saved", mainWindowGui)
 				}
 			})
 			saveBttn.Disable()
@@ -169,7 +169,7 @@ func openSecurityDia(creds Credentials) {
 
 			newPwd.Validator = func(s string) error {
 				pwdLen = len(s)
-				if len(s) < 1 {
+				if len(s) < 1 && len(newPwdCnfrm.Text) < 1 {
 					newPwdCnfrm.SetValidationError(nil)
 					pwdCnfmValid = true
 					pwdValid = true
@@ -196,9 +196,11 @@ func openSecurityDia(creds Credentials) {
 			newPwdCnfrm.Validator = func(s string) error {
 				newPwdEntry, _ := newPwdBind.Get()
 				newPwdCnfrmEntry, _ := newPwdCnfrmBind.Get()
-				fmt.Println("newPwdCnfrm validation", newPwdEntry, newPwdCnfrmEntry)
+				// fmt.Println("newPwdCnfrm validation", newPwdEntry, newPwdCnfrmEntry)
 				if len(newPwdEntry) < 1 && len(s) < 1 {
 					pwdCnfmValid = true
+					pwdValid = true
+					newPwd.SetValidationError(nil)
 					settingsChanged()
 					return nil
 				} else if len(s) < 6 {

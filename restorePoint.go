@@ -123,7 +123,7 @@ func showBackupDia(creds Credentials) {
 											}
 
 											if !isSavedWallet && isSavedName {
-												name := fmt.Sprintf("%v...%v", ldCredsWallet.Name[:8], ldCredsWallet.Name[len(ldCredsWallet.Name)-8:len(ldCredsWallet.Name)]) //if user registered same name giving it to a new name
+												name := fmt.Sprintf("%v...%v", ldCredsWallet.Address[:8], ldCredsWallet.Address[len(ldCredsWallet.Address)-8:len(ldCredsWallet.Address)]) //if user registered same name giving it to a new name
 												walletToAdd := Wallet{
 													Name:    name,
 													Address: ldCredsWallet.Address,
