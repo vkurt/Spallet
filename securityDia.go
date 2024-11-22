@@ -64,17 +64,6 @@ func openSecurityDia(creds Credentials) {
 			lgnTmeOut.SetText(lgnTmeOutMntStr)
 			var settingsChanged func()
 			sendOnlyKnown := userSettings.SendOnly
-			sendOnlyKnownChck := widget.NewCheck("Send assets only known addresses", func(b bool) {
-				if b {
-					sendOnlyKnown = true
-					settingsChanged()
-				} else {
-					sendOnlyKnown = false
-					settingsChanged()
-				}
-
-			})
-			sendOnlyKnownChck.Checked = userSettings.SendOnly
 
 			var securityForm *widget.Form
 
@@ -124,6 +113,29 @@ func openSecurityDia(creds Credentials) {
 
 			lgnTmeOutFrmItm := widget.NewFormItem("Login Time Out", container.New(layout.NewHBoxLayout(), lgnTmeOut, widget.NewLabel("Minutes (min 3 max 120)"), layout.NewSpacer()))
 			lgnTmeOutFrmItm.HintText = "."
+
+			settingsChanged = func() {
+				if lgnTmeOutMntStr == lgnTmeOut.Text && askPwd == userSettings.AskPwd && userSettings.SendOnly == sendOnlyKnown && pwdLen < 6 {
+					fmt.Println("Settings not changed")
+					saveBttn.Disable()
+				} else if !pwdValid || !tmeOutValid || !pwdCnfmValid {
+					fmt.Println("Something is wrong", pwdValid, tmeOutValid, pwdCnfmValid)
+					saveBttn.Disable()
+				} else if pwdValid && tmeOutValid && pwdCnfmValid {
+					saveBttn.Enable()
+				}
+			}
+			sendOnlyKnownChck := widget.NewCheck("Send assets only known addresses", func(b bool) {
+				if b {
+					sendOnlyKnown = true
+					settingsChanged()
+				} else {
+					sendOnlyKnown = false
+					settingsChanged()
+				}
+
+			})
+			sendOnlyKnownChck.Checked = userSettings.SendOnly
 
 			lgnTmeOut.Validator = func(s string) error {
 				noSpaces := !regexp.MustCompile(`\s`).MatchString(s)
@@ -265,18 +277,6 @@ func openSecurityDia(creds Credentials) {
 			}
 
 			PwdAskTypeChecks := container.New(layout.NewHBoxLayout(), pwdAskAllCheck, pwdAskLgnCheck, layout.NewSpacer())
-
-			settingsChanged = func() {
-				if lgnTmeOutMntStr == lgnTmeOut.Text && askPwd == userSettings.AskPwd && userSettings.SendOnly == sendOnlyKnown && pwdLen < 6 {
-					fmt.Println("Settings not changed")
-					saveBttn.Disable()
-				} else if !pwdValid || !tmeOutValid || !pwdCnfmValid {
-					fmt.Println("Something is wrong", pwdValid, tmeOutValid, pwdCnfmValid)
-					saveBttn.Disable()
-				} else if pwdValid && tmeOutValid && pwdCnfmValid {
-					saveBttn.Enable()
-				}
-			}
 
 			securityForm = widget.NewForm(
 				widget.NewFormItem("New Password", newPwd),
