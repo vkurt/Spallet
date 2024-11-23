@@ -19,6 +19,8 @@ import (
 	scriptbuilder "github.com/phantasma-io/phantasma-go/pkg/vm/script_builder"
 )
 
+var dexGasLimit = big.NewInt(30000)
+
 func createDexContent(creds Credentials) *fyne.Container {
 	amountInBinding := binding.NewString()
 	slippageBinding := binding.NewString()
@@ -63,7 +65,7 @@ func createDexContent(creds Credentials) *fyne.Container {
 		}
 
 		// Check KCAL for gas
-		gasFee := new(big.Int).Mul(userSettings.GasPrice, userSettings.DefaultGasLimit)
+		gasFee := new(big.Int).Mul(userSettings.GasPrice, dexGasLimit)
 		if err := checkFeeBalance(gasFee); err != nil {
 			dialog.ShowError(err, mainWindowGui)
 			return
@@ -153,15 +155,15 @@ func executeSwap(tokenIn, tokenOut string, amountIn *big.Int, slippageTolerance 
 		formatBalance(balance, latestAccountData.FungibleTokens[tokenIn].Decimals), tokenIn)
 
 	// Set increased gas limit specifically for swap operations
-	gasLimit := big.NewInt(30000)
+
 	fmt.Printf("\nGas settings:\n")
 	fmt.Printf("Price: %s\n", userSettings.GasPrice.String())
-	fmt.Printf("Limit: %s (increased for swap)\n", gasLimit.String())
+	fmt.Printf("Limit: %s (increased for swap)\n", dexGasLimit.String())
 
 	swapPayload := []byte("Spallet Swap")
 
 	sb := scriptbuilder.BeginScript()
-	script := sb.AllowGas(wallet.Address, cryptography.NullAddress().String(), userSettings.GasPrice, gasLimit).
+	script := sb.AllowGas(wallet.Address, cryptography.NullAddress().String(), userSettings.GasPrice, dexGasLimit).
 		CallContract("SATRN", "swap",
 			wallet.Address,      // from
 			amountIn,            // amountIn
