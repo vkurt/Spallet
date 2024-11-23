@@ -25,10 +25,6 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 
 	stakeFeeLimit := userSettings.DefaultGasLimit
 	feeAmount := new(big.Int).Mul(stakeFeeLimit, userSettings.GasPrice)
-	err := checkFeeBalance(feeAmount)
-	if err != nil {
-		dialog.ShowInformation("Low energy", "This account dont have enough Kcal to fill Specky's engines\nPlease check your default fee settings in network settings", mainWindowGui)
-	}
 
 	// Claiming Kcal stuff
 	remainedTimeForKcalGenLabel := widget.NewLabel(fmt.Sprintf("Time until next forging Ritual:\t%v", time.Duration(latestAccountData.RemainedTimeForKcalGen)*time.Second))
@@ -704,6 +700,10 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 			registerNameContainer,
 			stakeContainer,
 		))
+		err := checkFeeBalance(feeAmount)
+		if err != nil {
+			dialog.ShowInformation("Low energy", "This account dont have enough Kcal to fill Specky's engines\nPlease check your default fee limit/price in network settings\nor get some Kcal", mainWindowGui)
+		}
 		scrollableContainer.SetMinSize(fyne.NewSize(0, 500))
 		stakingInfo = container.NewVBox(scrollableContainer)
 
@@ -723,6 +723,10 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 			registerNameContainer,
 			stakeContainer,
 		))
+		err := checkFeeBalance(feeAmount)
+		if err != nil {
+			dialog.ShowInformation("Low energy", "This account dont have enough Kcal to fill Specky's engines\nPlease check your default fee limit/price in network settings\nor get some Kcal", mainWindowGui)
+		}
 		scrollableContainer.SetMinSize(fyne.NewSize(0, 500))
 		stakingInfo = container.NewVBox(scrollableContainer)
 
@@ -733,6 +737,10 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 			notStakerMessage,
 			stakeContainer,
 		))
+		err := checkFeeBalance(feeAmount)
+		if err != nil {
+			dialog.ShowInformation("Low energy", "This account dont have enough Kcal to fill Specky's engines\nPlease check your default fee limit/price in network settings\nor get some Kcal", mainWindowGui)
+		}
 		scrollableContainer.SetMinSize(fyne.NewSize(0, 500))
 		stakingInfo = container.NewVBox(scrollableContainer)
 

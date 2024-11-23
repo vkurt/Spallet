@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"net/url"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -125,10 +126,23 @@ func createTokenBalance(symbol string, balance string, isNFT bool, creds Credent
 func updateWalletInfo(creds Credentials, walletInfo *fyne.Container) {
 	walletInfo.Objects = []fyne.CanvasObject{
 
-		widget.NewButtonWithIcon(creds.Wallets[creds.LastSelectedWallet].Address, theme.ContentCopyIcon(), func() {
+		container.NewBorder(nil, nil, nil, widget.NewButtonWithIcon("", theme.SearchIcon(), func(Address string) func() {
+			return func() {
+				explorerURL := fmt.Sprintf("%s%s", userSettings.AccExplorerLink, creds.Wallets[creds.LastSelectedWallet].Address)
+				parsedURL, err := url.Parse(explorerURL)
+				if err != nil {
+					fmt.Println("Failed to parse URL:", err)
+					return
+				}
+				err = fyne.CurrentApp().OpenURL(parsedURL)
+				if err != nil {
+					fmt.Println("Failed to open URL:", err)
+				}
+			}
+		}(creds.Wallets[creds.LastSelectedWallet].Address)), widget.NewButtonWithIcon(creds.Wallets[creds.LastSelectedWallet].Address, theme.ContentCopyIcon(), func() {
 			fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(creds.Wallets[creds.LastSelectedWallet].Address)
 			dialog.ShowInformation("Copied", "Wallet Address copied to clipboard", fyne.CurrentApp().Driver().AllWindows()[0])
-		}),
+		})),
 	}
 	walletInfo.Refresh()
 }
@@ -260,7 +274,7 @@ func mainWindow(creds Credentials, regularTokens []fyne.CanvasObject, nftTokens 
 		container.NewTabItem("NFTs", nftScroll),
 		container.NewTabItem("Hodling", stakingContent),
 		container.NewTabItem("History", historyContent),
-		container.NewTabItem("Dex", widget.NewLabel("Dex interface not implemented\nwill try to integrate Saturn DEX but no promises so it means SOON 😂")),
+		container.NewTabItem("Dex", createDexContent(creds)),
 		container.NewTabItem("Bridge", widget.NewLabel("When Phantasma enables this\n will try to integrate it but no promises so it means SOON 😂")),
 		container.NewTabItem("Soon", soonContent))
 	tabContainer.SetTabLocation(container.TabLocationTop)
