@@ -277,7 +277,7 @@ func mainWindow(creds Credentials) {
 			feeAmount := new(big.Int).Mul(userSettings.DefaultGasLimit, userSettings.GasPrice)
 			err := checkFeeBalance(feeAmount)
 			if err != nil {
-				dialog.ShowInformation("Low energy", "This account dont have enough Kcal to fill Specky's engines\nPlease check your default fee limit/price in network settings\nor get some Kcal", mainWindowGui)
+				dialog.ShowInformation("Low energy", fmt.Sprintf("This account dont have enough Kcal to fill Specky's engines\nPlease check your default fee limit/price in network settings\nor get some Kcal\n\n%s", err), mainWindowGui)
 			}
 		case "History":
 			showUpdatingDialog()

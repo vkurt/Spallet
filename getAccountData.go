@@ -235,7 +235,7 @@ func getAccountData(walletAddress string, creds Credentials, override bool) erro
 		if latestAccountData.TokenCount < 1 {
 			noTokenContent := widget.NewLabelWithStyle("Your wallet is so empty, even the crypto memes are feeling sorry for you. \nNo shittokens to be found here!", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 			noTokenContent.Wrapping = fyne.TextWrapWord
-			tokenTab.Content = noTokenContent
+			tokenBoxes.Add(noTokenContent)
 
 		}
 		nftTab.Content = nftBoxes
