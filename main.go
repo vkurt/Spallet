@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/big"
 	"net/url"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -39,15 +40,18 @@ type Stake struct {
 var transactions []response.TransactionResult
 
 // var (
-// 	accTokenBalances = make(map[string]AccToken)
-// 	accNftBalances   = make(map[string]AccToken)
+//
+//	accTokenBalances = make(map[string]AccToken)
+//	accNftBalances   = make(map[string]AccToken)
+//
 // )
+var tokenTab = container.NewVScroll(container.NewVBox())
+var nftTab = container.NewVScroll(container.NewVBox())
+var accInfoTab = container.NewVScroll(container.NewVBox())
+var stakingTab = container.NewVScroll(container.NewVBox())
+var dexTab = container.NewVScroll(container.NewVBox())
 
-var regularTokens []fyne.CanvasObject
-var nftTokens []fyne.CanvasObject
-var accountSummary []fyne.CanvasObject
-var historyTab *fyne.Container
-var accBadges *fyne.Container
+var accBadges = container.NewScroll(container.NewVBox())
 var mainWindowGui fyne.Window
 
 var minSoulStake = big.NewInt(100000000)
@@ -55,12 +59,13 @@ var soulDecimals = 8
 var kcalDecimals = 10
 var soulMasterThreshold = big.NewInt(5000000000000)
 var kcalProdRate = 0.002
-var fetchFromSaved = false
+
 var pageSize = uint(25)
 var page = uint(1)
 var payload = []byte("Spallet")
 
 func main() {
+
 	a := app.New()
 	mainWindowGui = a.NewWindow("Spallet")
 	mainWindowGui.Resize(fyne.NewSize(800, 600))
@@ -75,6 +80,7 @@ func main() {
 		showExistingUserLogin()
 
 	}
+
 	mainWindowGui.ShowAndRun()
 }
 
@@ -147,26 +153,15 @@ func updateWalletInfo(creds Credentials, walletInfo *fyne.Container) {
 	walletInfo.Refresh()
 }
 
-func updateTabs(tokenScroll, nftScroll *container.Scroll, stakingContent *fyne.Container, creds Credentials, accInfo *container.Scroll) {
-	tokenScroll.Content = container.NewVBox(regularTokens...)
-	tokenScroll.Refresh()
-	nftScroll.Content = container.NewVBox(nftTokens...)
-	nftScroll.Refresh()
-	stakingContent.Objects = []fyne.CanvasObject{} // Populate staking content when the tab is selected
-	getAccountData(creds.Wallets[creds.LastSelectedWallet].Address, creds)
-	accInfo.Content = container.NewVBox(accountSummary...)
-	accInfo.Refresh()
-	accBadges.Objects = nil
-	accBadges.Objects = []fyne.CanvasObject{buildBadges()} // Update badges
-	accBadges.Refresh()                                    // Refresh the container to show updates
-}
-
 func showExistingUserLogin() {
 	if logoutTicker != nil {
 		logoutTicker.Stop()
 	}
+	if updateBalanceTimeOut != nil {
+		updateBalanceTimeOut.Stop()
+	}
 
-	stopBadgeAnimation()
+	// stopBadgeAnimation()
 
 	passwordEntry := widget.NewPasswordEntry()
 	logIn := func() {
@@ -184,9 +179,11 @@ func showExistingUserLogin() {
 			} else {
 				userAddressBook = ldAddrBk
 			}
+			autoUpdate(updateInterval, creds)
 			showUpdatingDialog()
-			loadSettings("data/essential/settings.spallet") // Load settings at startup
-			getChainStatistics()
+			loadSettings("data/essential/settings.spallet")                // Load settings at startup
+			loadTokenCache(creds)                                          // this will update  tokens data from cache if user dont dave cache yet it will create one with main tokens
+			latestTokenData.LastUpdateTime = time.Now().UTC().Unix() - 135 // we will update data automaticaly 15 sec after login with auto update
 			var foundWalletNumber = 0
 			var listedWallets = len(creds.WalletOrder)
 			for _, found := range creds.Wallets { //check if there is a unvisible wallet we have
@@ -221,8 +218,8 @@ func showExistingUserLogin() {
 				dialog.ShowInformation("Error", "Failed to get wallet balance: "+err.Error(), mainWindowGui)
 				return
 			} else {
-				fmt.Println("fetchFromSaved main", fetchFromSaved)
-				mainWindow(creds, regularTokens, nftTokens)
+
+				mainWindow(creds)
 				closeUpdatingDialog()
 				startLogoutTicker(userSettings.LgnTmeOut)
 			}
@@ -250,38 +247,38 @@ func showExistingUserLogin() {
 	logInLyt.Resize(fyne.NewSize(400, 150))
 	mainWindowGui.SetContent(logInLyt)
 	mainWindowGui.Canvas().Focus(passwordEntry)
-	fetchFromSaved = false
+
 }
 
-func mainWindow(creds Credentials, regularTokens []fyne.CanvasObject, nftTokens []fyne.CanvasObject) {
+func mainWindow(creds Credentials) {
 
 	walletInfo := container.NewVBox()
-	tokenScroll := container.NewVScroll(container.NewVBox())
-	tokenScroll.SetMinSize(fyne.NewSize(600, 500))
-	nftScroll := container.NewVScroll(container.NewVBox())
-	nftScroll.SetMinSize(fyne.NewSize(600, 500))
-	accInfoScroll := container.NewVScroll(container.NewVBox())
-	accInfoScroll.SetMinSize(fyne.NewSize(600, 500))
-	stakingContent := container.NewVBox() // Empty for now, will be populated when tab is selected
+
 	historyContent := container.NewVBox()
 	walletSelect := widget.NewSelect(creds.WalletOrder, nil) // Define walletSelect first
 	soonContent := widget.NewRichTextWithText("If you're a true OG you already know the drill, in Phantasma everything is just around the corner (SOON). To make life easier for newcomers, here’s a handy list of questions you might avoid asking in community channels, because the answer is always the same: SOON.\n\n1-Wen moon?\n2-Wen marketing\n3-Wen commnunication?\n4-Wen new listing?\n5-Wen Kcal listing?\n6-Wen decentralisation\n7-Wen live-lite to live (this is for samf)\n8-Wen billion dollar partnership\n9-Wen i can buy Pizza with Kcal?\n\n__Some soons for Spallet__\n\n1-Better Gui\n2-Better humors(as you can see, already getting there) 😂🤣\n3-Less bugs (if you found a bug its not a bug its a FEATURE 🤡)\n...and some bla bla bla... 😉🗨️")
 	soonContent.Wrapping = fyne.TextWrapWord
 
 	tabContainer := container.NewAppTabs(
-		container.NewTabItem("Info", accInfoScroll),
-		container.NewTabItem("Tokens", tokenScroll),
-		container.NewTabItem("NFTs", nftScroll),
-		container.NewTabItem("Hodling", stakingContent),
+		container.NewTabItem("Info", accInfoTab),
+		container.NewTabItem("Tokens", tokenTab),
+		container.NewTabItem("NFTs", nftTab),
+		container.NewTabItem("Hodling", stakingTab),
 		container.NewTabItem("History", historyContent),
 		container.NewTabItem("Dex", createDexContent(creds)),
 		container.NewTabItem("Bridge", widget.NewLabel("When Phantasma enables this\n will try to integrate it but no promises so it means SOON 😂")),
-		container.NewTabItem("Soon", soonContent))
+		container.NewTabItem("Soon", soonContent),
+	)
+
 	tabContainer.SetTabLocation(container.TabLocationTop)
 	tabContainer.OnSelected = func(tab *container.TabItem) {
 		switch tab.Text {
 		case "Hodling":
-			showStakingPage(stakingContent, creds)
+			feeAmount := new(big.Int).Mul(userSettings.DefaultGasLimit, userSettings.GasPrice)
+			err := checkFeeBalance(feeAmount)
+			if err != nil {
+				dialog.ShowInformation("Low energy", "This account dont have enough Kcal to fill Specky's engines\nPlease check your default fee limit/price in network settings\nor get some Kcal", mainWindowGui)
+			}
 		case "History":
 			showUpdatingDialog()
 			buildAndShowTxes(creds.Wallets[creds.LastSelectedWallet].Address, page, pageSize, historyContent)
@@ -304,18 +301,21 @@ func mainWindow(creds Credentials, regularTokens []fyne.CanvasObject, nftTokens 
 		buildAndShowChainStatistics()
 
 	})
-	balancesButton := widget.NewButton("Balances", func() {
+	refreshButton := widget.NewButton("Refresh", func() {
 		showUpdatingDialog()
-
-		mainWindow(creds, regularTokens, nftTokens)
+		err := dataFetch(creds)
+		if err != nil {
+			dialog.ShowError(err, mainWindowGui)
+		}
 		closeUpdatingDialog()
 	})
 	AddrBkBttn := widget.NewButton("Address Book", func() {
 		adddressBookDia(creds.Password)
 	})
-	accBadges.Objects = nil
-	accBadges.Objects = []fyne.CanvasObject{buildBadges()} // Initialize badges
-	accBadges.Refresh()
+
+	// accBadges.Objects = nil
+	// accBadges.Objects = []fyne.CanvasObject{buildBadges()} // Initialize badges
+	// accBadges.Refresh()
 	seperator := widget.NewSeparator()
 	securityBttn := widget.NewButton("Security", func() {
 		openSecurityDia(creds)
@@ -323,7 +323,7 @@ func mainWindow(creds Credentials, regularTokens []fyne.CanvasObject, nftTokens 
 	backupBttn := widget.NewButton("Rescue Point", func() { showBackupDia(creds) })
 	menu := container.NewBorder(
 		container.NewVBox(walletSelect, accBadges),
-		container.NewVBox(backupBttn, AddrBkBttn, securityBttn, chainStatsButton, balancesButton, manageAccountsButton, networkButton),
+		container.NewVBox(refreshButton, backupBttn, AddrBkBttn, securityBttn, chainStatsButton, manageAccountsButton, networkButton),
 		nil, nil, nil,
 	)
 
@@ -331,28 +331,22 @@ func mainWindow(creds Credentials, regularTokens []fyne.CanvasObject, nftTokens 
 	walletSelect.Selected = creds.LastSelectedWallet
 	walletSelect.OnChanged = func(selected string) {
 		creds.LastSelectedWallet = selected
+		autoUpdate(updateInterval, creds)
 		showUpdatingDialog()
-		err := getAccountData(creds.Wallets[selected].Address, creds)
+		err := dataFetch(creds)
 		if err != nil {
 			closeUpdatingDialog()
 			dialog.ShowInformation("Error", "Failed to update wallet balance: "+err.Error(), mainWindowGui)
 		} else {
 			updateWalletInfo(creds, walletInfo)
-			updateTabs(tokenScroll, nftScroll, stakingContent, creds, accInfoScroll) // Combined update
-
-			// accBadges.Objects = []fyne.CanvasObject{buildBadges()} // Update badges
-			// accBadges.Refresh()
 
 			saveCredentials(creds)
 
-			// Simulate clicking the "Balances" button
-			mainWindow(creds, regularTokens, nftTokens)
 			closeUpdatingDialog()
 		}
 	}
 
 	updateWalletInfo(creds, walletInfo)
-	updateTabs(tokenScroll, nftScroll, stakingContent, creds, accInfoScroll)
 
 	split := container.NewBorder(nil, nil, container.NewHBox(container.NewPadded(menu), seperator), nil, container.NewPadded(walletDetails))
 

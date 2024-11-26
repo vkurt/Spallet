@@ -80,7 +80,7 @@ func buildAndShowAccInfo(creds Credentials) {
 
 	}
 
-	accBadges = buildBadges()
+	buildBadges()
 
 	accSummaryInfo := fmt.Sprintf("Local Name:\t%s\nOn Chain Name:\t%v\nNick name:\t\t%v\nAddress:\t\t%s\nHave %v token(s), %v NFT(s) from %v collections",
 		creds.LastSelectedWallet, latestAccountData.OnChainName, latestAccountData.NickName, creds.Wallets[creds.LastSelectedWallet].Address, latestAccountData.TokenCount, latestAccountData.TotalNft, latestAccountData.NftTypes)
@@ -149,6 +149,20 @@ func buildAndShowAccInfo(creds Credentials) {
 		widget.NewLabel(accSoulMasterInfo),
 	)
 
-	accountSummary = []fyne.CanvasObject{accInfo}
+	x, y := tokenTab.Offset.Components()
+	tokenTab.SetMinSize(fyne.NewSize(0, 525))
+	tokenTab.Refresh()
+	tokenTab.Offset = fyne.NewPos(x, y)
+
+	x, y = nftTab.Offset.Components()
+	nftTab.SetMinSize(fyne.NewSize(0, 525))
+	nftTab.Refresh()
+	nftTab.Offset = fyne.NewPos(x, y)
+
+	x, y = accInfoTab.Offset.Components()
+	accInfoTab.Content = accInfo
+	accInfoTab.SetMinSize(fyne.NewSize(0, 525))
+	accInfoTab.Refresh()
+	accInfoTab.Offset = fyne.NewPos(x, y)
 
 }

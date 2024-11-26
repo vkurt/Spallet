@@ -228,7 +228,7 @@ func showBackupDia(creds Credentials) {
 								currentMainDialog.Hide()
 								restoreDia.Hide()
 								dialog.ShowInformation("Found new data", restoreInfo, mainWindowGui)
-								mainWindow(creds, regularTokens, nftTokens)
+								dataFetch(creds)
 
 							} else {
 

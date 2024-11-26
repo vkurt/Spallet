@@ -12,9 +12,6 @@ import (
 var soulMasterRewardPool = 125000
 
 type ChainStatisticsData struct {
-	SoulData                 TokenData
-	KcalData                 TokenData
-	CrownData                TokenData
 	TotalStakedSoul          *big.Int
 	EstSMReward              float64
 	SMApr                    float64
@@ -36,7 +33,6 @@ func getChainStatistics() error {
 	if passedTimeFromLastFetch > 9 {
 		fmt.Println("******Refreshing data from chain for chain stats*********")
 		latestChainStatisticsData.DataFetchTime = currentTime
-		fetchChainMainTokensFromChain()
 
 		// getting last Master claim date
 		sbGetLastMasterClaim := scriptbuilder.BeginScript()

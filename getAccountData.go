@@ -19,19 +19,21 @@ var latestAccountData = AccountInfoData{
 	FungibleTokens: make(map[string]AccToken),
 	NonFungible:    make(map[string]AccToken),
 }
+var lastCountdownUpdate int64
 
-func getAccountData(walletAddress string, creds Credentials) error {
+func getAccountData(walletAddress string, creds Credentials, override bool) error {
 	currentUtcTime := time.Now().UTC()
 	passedTime := currentUtcTime.Unix() - latestAccountData.StatCheckTime
 	fetchAccData := false
 	var err error
 	fmt.Println("******Getting acc statistics*********")
 	var actualTxCount int
+
 	if latestAccountData.Address == walletAddress && latestAccountData.TransactionCount > 0 {
 		actualTxCount = latestAccountData.TransactionCount
 	}
 
-	if passedTime > 9 {
+	if passedTime >= 10 {
 		actualTxCount, err = client.GetAddressTransactionCount(walletAddress, userSettings.ChainName)
 		if err != nil {
 			return err
@@ -56,13 +58,47 @@ func getAccountData(walletAddress string, creds Credentials) error {
 		}
 	}
 
-	if fetchAccData {
+	if latestChainStatisticsData.DataFetchTime < currentUtcTime.Unix() {
+		passed := currentUtcTime.Unix() - lastCountdownUpdate
+		if passed < latestChainStatisticsData.RemainedTimeForCrown {
+			latestChainStatisticsData.RemainedTimeForCrown -= passed
+
+		} else {
+			latestChainStatisticsData.RemainedTimeForCrown = 0
+
+		}
+	}
+
+	if latestAccountData.StatCheckTime < currentUtcTime.Unix() && !fetchAccData { // trying to update staking countdowns without updating it from chain
+		passed := currentUtcTime.Unix() - lastCountdownUpdate
+		if passed < latestAccountData.RemainedTimeForKcalGen {
+			latestAccountData.RemainedTimeForKcalGen -= passed
+
+		} else {
+			latestAccountData.RemainedTimeForKcalGen = 0
+
+		}
+
+		if passed < latestAccountData.RemainedTimeForUnstake {
+			latestAccountData.RemainedTimeForUnstake -= passed
+
+		} else {
+			latestAccountData.RemainedTimeForUnstake = 0
+
+		}
+		lastCountdownUpdate = currentUtcTime.Unix()
+		buildAndShowAccInfo(creds)
+		showStakingPage(creds)
+
+	}
+
+	if fetchAccData || override {
+		lastCountdownUpdate = currentUtcTime.Unix()
 		latestAccountData.StatCheckTime = currentUtcTime.Unix()
 		latestAccountData.Address = walletAddress
 		latestAccountData.TransactionCount = actualTxCount
 		latestAccountData.Network = userSettings.NetworkName
 		fmt.Println("******Refreshing data from chain for Account data*********")
-		accountSummary = nil
 
 		latestAccountData.StatCheckTime = currentUtcTime.Unix()
 		latestAccountData.Address = walletAddress
@@ -76,8 +112,6 @@ func getAccountData(walletAddress string, creds Credentials) error {
 		latestAccountData.TotalNft = 0
 		latestAccountData.TokenCount = 0
 
-		regularTokens = []fyne.CanvasObject{}
-		nftTokens = []fyne.CanvasObject{}
 		// for k := range accNftBalances {
 		// 	delete(accNftBalances, k)
 		// }
@@ -112,7 +146,8 @@ func getAccountData(walletAddress string, creds Credentials) error {
 			Unclaimed: *unclaimedKcal,
 			Time:      account.Stakes.Time,
 		}
-
+		tokenBoxes := container.NewVBox()
+		nftBoxes := container.NewVBox()
 		crownAmount := 0
 		for _, token := range account.Balances {
 			tokenBalance := StringToBigInt(token.Amount)
@@ -121,7 +156,7 @@ func getAccountData(walletAddress string, creds Credentials) error {
 			amountBig := StringToBigInt(token.Amount)
 
 			if len(token.Ids) == 0 {
-				ftTokenData, _ := fetchUserTokensInfoFromChain(token.Symbol, 3)
+				ftTokenData, _ := fetchUserTokensInfoFromChain(token.Symbol, 3, false, creds)
 				fungible := AccToken{
 					Symbol:        token.Symbol,
 					Name:          ftTokenData.Name,
@@ -132,13 +167,13 @@ func getAccountData(walletAddress string, creds Credentials) error {
 					Address:       ftTokenData.Address,
 					Owner:         ftTokenData.Owner,
 					Flags:         ftTokenData.Flags,
-					Script:        ftTokenData.Script,
-					Series:        ftTokenData.Series,
-					External:      ftTokenData.External,
-					Price:         ftTokenData.Price,
-					Amount:        amountBig,
-					Chain:         token.Chain,
-					Ids:           token.Ids,
+
+					Series:   ftTokenData.Series,
+					External: ftTokenData.External,
+					Price:    ftTokenData.Price,
+					Amount:   amountBig,
+					Chain:    token.Chain,
+					Ids:      token.Ids,
 				}
 				// fmt.Println("token", fungible.Symbol)
 				// fmt.Println("tkontoken", token.Symbol)
@@ -147,12 +182,14 @@ func getAccountData(walletAddress string, creds Credentials) error {
 				if latestAccountData.TokenCount == 1 {
 					haveTokenContent := widget.NewLabelWithStyle("Ohhh, you’ve got a moon bag! But the million-dollar question is, 'Wen moon?' 🚀🌕", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 					haveTokenContent.Wrapping = fyne.TextWrapWord
-					regularTokens = append(regularTokens, haveTokenContent)
+					tokenBoxes.Add(haveTokenContent)
+
 				}
-				regularTokens = append(regularTokens, tokenBalanceBox) //*******
+				tokenBoxes.Add(tokenBalanceBox)
+
 				latestAccountData.FungibleTokens[token.Symbol] = fungible
 			} else {
-				nftTokenData, _ := fetchUserTokensInfoFromChain(token.Symbol, 3)
+				nftTokenData, _ := fetchUserTokensInfoFromChain(token.Symbol, 3, false, creds)
 				nonFungible := AccToken{
 					Symbol:        token.Symbol,
 					Name:          nftTokenData.Name,
@@ -163,13 +200,13 @@ func getAccountData(walletAddress string, creds Credentials) error {
 					Address:       nftTokenData.Address,
 					Owner:         nftTokenData.Owner,
 					Flags:         nftTokenData.Flags,
-					Script:        nftTokenData.Script,
-					Series:        nftTokenData.Series,
-					External:      nftTokenData.External,
-					Price:         nftTokenData.Price,
-					Amount:        amountBig,
-					Chain:         token.Chain,
-					Ids:           token.Ids,
+
+					Series:   nftTokenData.Series,
+					External: nftTokenData.External,
+					Price:    nftTokenData.Price,
+					Amount:   amountBig,
+					Chain:    token.Chain,
+					Ids:      token.Ids,
 				}
 				if token.Symbol == "CROWN" {
 					crownAmount, _ = strconv.Atoi(token.Amount)
@@ -179,26 +216,32 @@ func getAccountData(walletAddress string, creds Credentials) error {
 				if latestAccountData.NftTypes == 1 {
 					haveNftContent := widget.NewLabelWithStyle("There is some Smart NFTs that could probably teach you a thing or two.\nLet’s hope they share their secrets with you and make you a billionaire! 💸🧠", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 					haveNftContent.Wrapping = fyne.TextWrapWord
-					nftTokens = append(nftTokens, haveNftContent)
+					nftBoxes.Add(haveNftContent)
+
 				}
 				nftAmount, _ := strconv.Atoi(token.Amount)
 				latestAccountData.TotalNft += int64(nftAmount)
 				latestAccountData.NonFungible[token.Symbol] = nonFungible
 				tokenBalanceBox = createTokenBalance(token.Symbol, formattedBalance, len(token.Ids) > 0, creds, int(token.Decimals), nonFungible.Name)
-				nftTokens = append(nftTokens, tokenBalanceBox) //******
+				nftBoxes.Add(tokenBalanceBox)
 			}
 		}
 
 		if latestAccountData.NftTypes < 1 {
 			noNFTContent := widget.NewLabelWithStyle("No Smart NFTs in your wallet? It’s like being a gamer without a high score! Time to level up and let the games begin. 🎮✨", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 			noNFTContent.Wrapping = fyne.TextWrapWord
-			nftTokens = append(nftTokens, noNFTContent)
+			nftBoxes.Add(noNFTContent)
 		}
 		if latestAccountData.TokenCount < 1 {
 			noTokenContent := widget.NewLabelWithStyle("Your wallet is so empty, even the crypto memes are feeling sorry for you. \nNo shittokens to be found here!", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 			noTokenContent.Wrapping = fyne.TextWrapWord
-			regularTokens = append(regularTokens, noTokenContent)
+			tokenTab.Content = noTokenContent
+
 		}
+		nftTab.Content = nftBoxes
+		tokenTab.Content = tokenBoxes
+
+		// tokenScrollgtry.Objects = []fyne.CanvasObject{tokenScrollg}
 		latestAccountData.KcalBoost = int16(crownAmount) * 5
 
 		// **************************************************************************************************************************
@@ -339,6 +382,7 @@ func getAccountData(walletAddress string, creds Credentials) error {
 		}
 
 		buildAndShowAccInfo(creds)
+		showStakingPage(creds)
 
 	}
 	// saveLatestAccountData("accountdata", creds, latestAccountData)
@@ -398,17 +442,17 @@ func calculateKcalDailyProd(accKcalBoost int16, stakedAmountKcalCalc big.Int, kc
 // 	return savedAccInfo, nil
 // }
 
-var animationRunning bool = false
-var stopAnimation chan bool
+// var animationRunning bool = false
+// var stopAnimation chan bool
 
 func buildBadges() *fyne.Container {
-	var enableAnimation bool = latestAccountData.IsStaker
+	// var enableAnimation bool = latestAccountData.IsStaker
 	var mainBadgePath string
 	var crownBadgePath string
 	var soulMasterBadgePath string
 	var stakingBadgePath string
 	var networkBadgePath string
-	var defaultAnSpeed = 25.0
+	// var defaultAnSpeed = 25.0
 
 	fmt.Println("******Building badges*****")
 
@@ -429,11 +473,11 @@ func buildBadges() *fyne.Container {
 		mainBadgePath = "img/stats/UNKNOWN.png"
 	}
 
-	if latestAccountData.KcalBoost > 0 {
-		defaultAnSpeed = defaultAnSpeed / (float64(latestAccountData.KcalBoost)/100 + 1)
-	} else {
-		defaultAnSpeed = 25
-	}
+	// if latestAccountData.KcalBoost > 0 {
+	// 	defaultAnSpeed = defaultAnSpeed / (float64(latestAccountData.KcalBoost)/100 + 1)
+	// } else {
+	// 	defaultAnSpeed = 25
+	// }
 
 	mainBadge := canvas.NewImageFromResource(loadBadgeImageResource(mainBadgePath))
 	mainBadge.FillMode = canvas.ImageFillContain
@@ -498,45 +542,48 @@ func buildBadges() *fyne.Container {
 		mainBadge,
 	)
 
-	stopBadgeAnimation()
+	// stopBadgeAnimation()
 
-	if enableAnimation && !animationRunning {
-		animationRunning = true
-		stopAnimation = make(chan bool)
-		fmt.Println("Animation started")
-		go func() {
-			var scale float32 = 1.0
-			var increment float32 = 0.01
-			anSpeed := time.Duration(defaultAnSpeed) * time.Millisecond
+	// if enableAnimation && !animationRunning { // liked it at first but it using unnecessary cpu power
+	// 	animationRunning = true
+	// 	stopAnimation = make(chan bool)
+	// 	fmt.Println("Animation started")
+	// 	go func() {
+	// 		var scale float32 = 1.0
+	// 		var increment float32 = 0.01
+	// 		anSpeed := time.Duration(defaultAnSpeed) * time.Millisecond
 
-			fmt.Println("anSpeed", anSpeed)
-			for {
-				select {
-				case <-stopAnimation:
-					animationRunning = false
-					return
-				case <-time.Tick(anSpeed):
-					if scale >= 1.1 || scale <= 0.9 {
-						increment = -increment
-					}
-					scale += increment
-					stakingBadge.Resize(fyne.NewSize(26*scale, 26*scale))
-					stakingBadge.Refresh()
-				}
-			}
-		}()
-	} else if !enableAnimation && animationRunning {
-		fmt.Println("Animation stopped")
-		stopBadgeAnimation()
-	}
-
+	// 		fmt.Println("anSpeed", anSpeed)
+	// 		for {
+	// 			select {
+	// 			case <-stopAnimation:
+	// 				animationRunning = false
+	// 				return
+	// 			case <-time.Tick(anSpeed):
+	// 				if scale >= 1.1 || scale <= 0.9 {
+	// 					increment = -increment
+	// 				}
+	// 				scale += increment
+	// 				stakingBadge.Resize(fyne.NewSize(26*scale, 26*scale))
+	// 				stakingBadge.Refresh()
+	// 			}
+	// 		}
+	// 	}()
+	// } else if !enableAnimation && animationRunning {
+	// 	fmt.Println("Animation stopped")
+	// 	stopBadgeAnimation()
+	// }
+	badgesSize := imageContainer.MinSize()
+	accBadges.Content = imageContainer
+	accBadges.SetMinSize(badgesSize)
+	accBadges.Refresh()
 	return imageContainer
 }
 
-func stopBadgeAnimation() {
-	if animationRunning {
-		stopAnimation <- true
-		close(stopAnimation)
-		animationRunning = false
-	}
-}
+// func stopBadgeAnimation() {
+// 	if animationRunning {
+// 		stopAnimation <- true
+// 		close(stopAnimation)
+// 		animationRunning = false
+// 	}
+// }

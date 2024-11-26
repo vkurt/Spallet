@@ -2,6 +2,7 @@
 *.spallet
 *.key
 *.json
+*.cache
 
 
 # Ignore compiled files

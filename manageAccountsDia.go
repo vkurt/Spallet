@@ -107,7 +107,7 @@ func manageAccountsDia(creds Credentials) {
 					if err := saveCredentials(creds); err != nil {
 						dialog.NewError(err, fyne.CurrentApp().Driver().AllWindows()[0]).Show()
 					}
-					mainWindow(creds, regularTokens, nftTokens)
+					mainWindow(creds)
 					if manageAccCurrDia != nil {
 						manageAccCurrDia.Hide()
 					}
@@ -163,7 +163,7 @@ func manageAccountsDia(creds Credentials) {
 						}
 						if creds.LastSelectedWallet == walletName {
 							creds.LastSelectedWallet = renameEntry.Text
-							mainWindow(creds, regularTokens, nftTokens)
+							mainWindow(creds)
 						}
 						if err := saveCredentials(creds); err != nil {
 							dialog.NewError(err, mainWindowGui)
@@ -240,8 +240,7 @@ func manageAccountsDia(creds Credentials) {
 
 							} else if walletName == creds.LastSelectedWallet && len(creds.WalletOrder) == 0 {
 								creds.LastSelectedWallet = ""
-								regularTokens = []fyne.CanvasObject{}
-								nftTokens = []fyne.CanvasObject{}
+
 								latestAccountData = AccountInfoData{FungibleTokens: make(map[string]AccToken), NonFungible: make(map[string]AccToken)}
 							}
 							if err := saveCredentials(creds); err != nil {
@@ -249,7 +248,7 @@ func manageAccountsDia(creds Credentials) {
 							}
 							manageAccCurrDia = dialog.NewInformation("Account Removed", "Account removed succesfully", mainWindowGui)
 							buildWalletButtons()
-							manageAccCurrDia.Show()
+							// manageAccCurrDia.Show()
 							walletScroll.Content.Refresh()
 
 						}
@@ -1099,7 +1098,7 @@ func manageAccountsDia(creds Credentials) {
 		})
 
 		backButton := widget.NewButton("Back", func() {
-			mainWindow(creds, regularTokens, nftTokens)
+			// mainWindow(creds)
 			currentMainDialog.Hide()
 		})
 

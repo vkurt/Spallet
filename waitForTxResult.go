@@ -52,7 +52,7 @@ func showTxResultDialog(result string, cred Credentials) {
 	updateButton := widget.NewButton("Update Balance & Return to Main", func() {
 		// mainWindowGui.SetContent(resultLabel)
 		dataFetch(cred)
-		mainWindow(cred, regularTokens, nftTokens)
+
 		currentMainDialog.Hide()
 		resultDia.Hide()
 	})

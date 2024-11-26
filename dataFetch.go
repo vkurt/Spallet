@@ -1,28 +1,33 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
+	"os"
+	"path/filepath"
 	"time"
 
-	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/widget"
 )
 
 type TokenData struct {
-	Symbol        string   `json:"symbol"`
-	Name          string   `json:"name"`
-	Decimals      int      `json:"decimals"`
-	CurrentSupply string   `json:"currentSupply"`
-	MaxSupply     string   `json:"maxSupply"`
-	BurnedSupply  string   `json:"burnedSupply"`
-	Address       string   `json:"address"`
-	Owner         string   `json:"owner"`
-	Flags         string   `json:"flags"`
-	Script        string   `json:"script"`
-	Series        []string `json:"series"`
-	External      []string `json:"external"`
-	Price         []string `json:"price"`
+	Symbol        string `json:"symbol"`
+	Name          string `json:"name"`
+	Decimals      int    `json:"decimals"`
+	CurrentSupply string `json:"currentSupply"`
+	MaxSupply     string `json:"maxSupply"`
+	BurnedSupply  string `json:"burnedSupply"`
+	Address       string `json:"address"`
+	Owner         string `json:"owner"`
+	Flags         string `json:"flags"`
+
+	Series   []string `json:"series"`
+	External []string `json:"external"`
+	Price    []string `json:"price"`
 }
 
 type AccToken struct {
@@ -44,6 +49,87 @@ type AccToken struct {
 	Ids           []string
 }
 
+type UpdatedTokenData struct {
+	LastUpdateTime int64                `json:"last_update_time"`
+	Token          map[string]TokenData `json:"token"`
+}
+
+var updateBalanceTimeOut *time.Ticker
+
+const updateInterval = 15 // in seconds
+
+var latestTokenData = UpdatedTokenData{Token: make(map[string]TokenData)}
+
+func autoUpdate(timeout int, creds Credentials) {
+	if updateBalanceTimeOut != nil {
+		updateBalanceTimeOut.Stop()
+	}
+	updateBalanceTimeOut = time.NewTicker(time.Duration(timeout) * time.Second)
+	go func() {
+
+		for range updateBalanceTimeOut.C {
+			fmt.Println("****Auto Update Balances*****")
+			dataFetch(creds)
+		}
+	}()
+}
+
+func saveTokenCache() error {
+	filename := "data/cache/" + userSettings.NetworkName + "token.cache"
+
+	// Ensure the directory exists
+	if err := os.MkdirAll(filepath.Dir(filename), 0700); err != nil {
+		return err
+	}
+
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	err = json.NewEncoder(file).Encode(&latestTokenData)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func loadTokenCache(creds Credentials) {
+	path := "data/cache/" + userSettings.NetworkName + "token.cache"
+	file, err := os.Open(path)
+	if err != nil {
+		fmt.Println("file not found err", err)
+		// File doesn't exist, create with default settings
+		latestTokenData.Token["SOUL"] = TokenData{Symbol: "SOUL"} //ensuring we always have main token data
+		latestTokenData.Token["KCAL"] = TokenData{Symbol: "KCAL"}
+		latestTokenData.Token["CROWN"] = TokenData{Symbol: "CROWN"}
+		fetchUserTokensInfoFromChain("", 3, true, creds)
+		err = saveTokenCache()
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("failed to save default settings\n%v", err), mainWindowGui)
+		}
+
+		return
+	}
+	defer file.Close()
+
+	err = json.NewDecoder(file).Decode(&latestTokenData)
+	if err != nil {
+		fmt.Println("decode err", err)
+		latestTokenData.Token["SOUL"] = TokenData{Symbol: "SOUL"} //ensuring we always have main token data
+		latestTokenData.Token["KCAL"] = TokenData{Symbol: "KCAL"}
+		latestTokenData.Token["CROWN"] = TokenData{Symbol: "CROWN"}
+		fetchUserTokensInfoFromChain("", 3, true, creds)
+		err = saveTokenCache()
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("failed to load Token Cache and saved default\n%v", err), mainWindowGui)
+		}
+	}
+
+}
+
 func dataFetch(creds Credentials) error {
 	_, ok := creds.Wallets[creds.LastSelectedWallet]
 
@@ -55,8 +141,8 @@ func dataFetch(creds Credentials) error {
 				currentMainDialog.Hide()
 			}
 			creds.LastSelectedWallet = ""
-			regularTokens = []fyne.CanvasObject{}
-			nftTokens = []fyne.CanvasObject{}
+			tokenTab.Content = container.NewVBox(widget.NewLabel("This wallet not containing any account"))
+			nftTab.Content = container.NewVBox(widget.NewLabel("This wallet not containing any account"))
 			latestAccountData = AccountInfoData{FungibleTokens: make(map[string]AccToken), NonFungible: make(map[string]AccToken)}
 			buildAndShowAccInfo(creds) // tryinh to not crash wallet if user somehow removes all acc data
 			// mainWindow(creds, regularTokens, nftTokens)
@@ -90,137 +176,143 @@ func dataFetch(creds Credentials) error {
 	// } else {
 
 	// }
+	var err error
 
-	fmt.Println("***********reading chain*************")
-	err := getChainStatistics()
+	if (time.Now().UTC().Unix() - latestTokenData.LastUpdateTime) > 150 { //no need to update this data frequently updating it before min logout timeout
+		fmt.Println("*****Updating Token Data*****")
+		_, err = fetchUserTokensInfoFromChain("", 3, true, creds)
+		if err != nil {
+			return err
+		}
+		fmt.Println("***********reading chain*************")
+		err = getChainStatistics()
+		if err != nil {
+			return err
+		}
+		saveTokenCache()
+
+	}
+
+	err = getAccountData(creds.Wallets[creds.LastSelectedWallet].Address, creds, false)
 	if err != nil {
 		return err
 	}
-	err = getAccountData(creds.Wallets[creds.LastSelectedWallet].Address, creds)
-	if err != nil {
-		return err
-	}
+
 	return nil
 }
 
 // Fetch new data from the server with retry logic
-func fetchUserTokensInfoFromChain(symbol string, retries int) (TokenData, error) {
+// if update is true it will only update token data in memory
+func fetchUserTokensInfoFromChain(symbol string, retries int, update bool, creds Credentials) (TokenData, error) {
+	switch update {
+	case true:
+		cantFindTokenData := false
+		latestTokenData.LastUpdateTime = time.Now().UTC().Unix()
+		for _, token := range latestTokenData.Token {
+			for i := 0; i < retries; i++ {
+				fmt.Println("****updating token data from chain for token "+token.Symbol+" try ", i+1, "******")
+				chainTokenData, err := client.GetToken(token.Symbol, false)
+				if err == nil {
 
-	ft, ok := latestAccountData.FungibleTokens[symbol]
-	if ok {
-		fmt.Println("****yay we have " + symbol + " token data in memory****")
-		tokenData := TokenData{
-			Symbol:        ft.Symbol,
-			Name:          ft.Name,
-			Decimals:      ft.Decimals,
-			CurrentSupply: ft.CurrentSupply,
-			MaxSupply:     ft.MaxSupply,
-			BurnedSupply:  ft.BurnedSupply,
-			Address:       ft.Address,
-			Owner:         ft.Owner,
-			Flags:         ft.Flags,
-			Script:        ft.Script,
-			Series:        nil, // it seems sdk returning wrong types or maybe server
-			External:      nil,
-			Price:         nil,
-		}
-		return tokenData, nil
-	}
+					tokenData := TokenData{
+						Symbol:        chainTokenData.Symbol,
+						Name:          chainTokenData.Name,
+						Decimals:      chainTokenData.Decimals,
+						CurrentSupply: chainTokenData.CurrentSupply,
+						MaxSupply:     chainTokenData.MaxSupply,
+						BurnedSupply:  chainTokenData.BurnedSupply,
+						Address:       chainTokenData.Address,
+						Owner:         chainTokenData.Owner,
+						Flags:         chainTokenData.Flags,
 
-	nft, ok := latestAccountData.FungibleTokens[symbol]
-	if ok {
-		fmt.Println("****yay we have " + symbol + " token data in memory****")
-		tokenData := TokenData{
-			Symbol:        nft.Symbol,
-			Name:          nft.Name,
-			Decimals:      nft.Decimals,
-			CurrentSupply: nft.CurrentSupply,
-			MaxSupply:     nft.MaxSupply,
-			BurnedSupply:  nft.BurnedSupply,
-			Address:       nft.Address,
-			Owner:         nft.Owner,
-			Flags:         nft.Flags,
-			Script:        nft.Script,
-			Series:        nil, // it seems sdk returning wrong types or maybe server
-			External:      nil,
-			Price:         nil,
-		}
-		return tokenData, nil
-	}
-
-	for i := 0; i < retries; i++ {
-		fmt.Println("****shit checking chain for token " + symbol + " ******")
-		chainTokenData, err := client.GetToken(symbol, false)
-		if err == nil {
-
-			tokenData := TokenData{
-				Symbol:        chainTokenData.Symbol,
-				Name:          chainTokenData.Name,
-				Decimals:      chainTokenData.Decimals,
-				CurrentSupply: chainTokenData.CurrentSupply,
-				MaxSupply:     chainTokenData.MaxSupply,
-				BurnedSupply:  chainTokenData.BurnedSupply,
-				Address:       chainTokenData.Address,
-				Owner:         chainTokenData.Owner,
-				Flags:         chainTokenData.Flags,
-				Script:        chainTokenData.Script,
-				Series:        nil, // it seems sdk returning wrong types or maybe server
-				External:      nil,
-				Price:         nil,
+						Series:   nil, // it seems sdk returning wrong types or maybe server
+						External: nil,
+						Price:    nil,
+					}
+					latestTokenData.Token[tokenData.Symbol] = tokenData
+					fmt.Println("updated token", token.Symbol)
+					break
+				}
+				// Log the error and retry after a delay
+				log.Printf("Error fetching tokens (attempt %d/%d): %v", i+1, retries, err)
+				time.Sleep(500 * time.Millisecond) // Delay before retrying
+				if i == 2 {
+					cantFindTokenData = true
+					break
+				}
 			}
-			return tokenData, err
+			if cantFindTokenData {
+				break
+			}
+
+		}
+		if cantFindTokenData {
+			fmt.Println("!!!!!! Token cache maybe corrupted resetting !!!!!!")
+			for k := range latestTokenData.Token {
+				delete(latestTokenData.Token, k)
+			}
+			latestTokenData.Token["SOUL"] = TokenData{Symbol: "SOUL"} //ensuring we always have main token data
+			latestTokenData.Token["KCAL"] = TokenData{Symbol: "KCAL"}
+			latestTokenData.Token["CROWN"] = TokenData{Symbol: "CROWN"}
+			getAccountData(creds.Wallets[creds.LastSelectedWallet].Address, creds, true)
+			saveTokenCache()
 		}
 
-		// Log the error and retry after a delay
-		log.Printf("Error fetching tokens (attempt %d/%d): %v", i+1, retries, err)
-		time.Sleep(500 * time.Millisecond) // Delay before retrying
+		return TokenData{}, nil
+
+	case false:
+		token, ok := latestTokenData.Token[symbol]
+		if ok {
+			fmt.Println("****yay we have " + symbol + " token data in memory****")
+			tokenData := TokenData{
+				Symbol:        token.Symbol,
+				Name:          token.Name,
+				Decimals:      token.Decimals,
+				CurrentSupply: token.CurrentSupply,
+				MaxSupply:     token.MaxSupply,
+				BurnedSupply:  token.BurnedSupply,
+				Address:       token.Address,
+				Owner:         token.Owner,
+				Flags:         token.Flags,
+
+				Series:   nil, // it seems sdk returning wrong types or maybe server
+				External: nil,
+				Price:    nil,
+			}
+			return tokenData, nil
+		}
+
+		for i := 0; i < retries; i++ {
+			fmt.Println("****shit checking chain for token " + symbol + " ******")
+			chainTokenData, err := client.GetToken(symbol, false)
+			if err == nil {
+
+				tokenData := TokenData{
+					Symbol:        chainTokenData.Symbol,
+					Name:          chainTokenData.Name,
+					Decimals:      chainTokenData.Decimals,
+					CurrentSupply: chainTokenData.CurrentSupply,
+					MaxSupply:     chainTokenData.MaxSupply,
+					BurnedSupply:  chainTokenData.BurnedSupply,
+					Address:       chainTokenData.Address,
+					Owner:         chainTokenData.Owner,
+					Flags:         chainTokenData.Flags,
+
+					Series:   nil, // it seems sdk returning wrong types or maybe server
+					External: nil,
+					Price:    nil,
+				}
+				latestTokenData.Token[tokenData.Symbol] = tokenData
+				return tokenData, err
+			}
+
+			// Log the error and retry after a delay
+			log.Printf("Error fetching tokens (attempt %d/%d): %v", i+1, retries, err)
+			time.Sleep(500 * time.Millisecond) // Delay before retrying
+		}
+
 	}
+
 	return TokenData{}, fmt.Errorf("failed to fetch tokens after %d attempts", retries)
-}
 
-func fetchChainMainTokensFromChain() {
-	crownData, _ := client.GetToken("CROWN", false)
-	latestChainStatisticsData.CrownData.Address = crownData.Address
-	latestChainStatisticsData.CrownData.BurnedSupply = crownData.BurnedSupply
-	latestChainStatisticsData.CrownData.CurrentSupply = crownData.CurrentSupply
-	latestChainStatisticsData.CrownData.Decimals = crownData.Decimals
-	latestChainStatisticsData.CrownData.External = nil
-	latestChainStatisticsData.CrownData.Flags = crownData.Flags
-	latestChainStatisticsData.CrownData.MaxSupply = crownData.MaxSupply
-	latestChainStatisticsData.CrownData.Name = crownData.Name
-	latestChainStatisticsData.CrownData.Owner = crownData.Owner
-	latestChainStatisticsData.CrownData.Price = nil
-	latestChainStatisticsData.CrownData.Script = crownData.Script
-	latestChainStatisticsData.CrownData.Series = nil
-	latestChainStatisticsData.CrownData.Symbol = crownData.Symbol
-
-	soulData, _ := client.GetToken("SOUL", false)
-	latestChainStatisticsData.SoulData.Address = soulData.Address
-	latestChainStatisticsData.SoulData.BurnedSupply = soulData.BurnedSupply
-	latestChainStatisticsData.SoulData.CurrentSupply = soulData.CurrentSupply
-	latestChainStatisticsData.SoulData.Decimals = soulData.Decimals
-	latestChainStatisticsData.SoulData.External = nil
-	latestChainStatisticsData.SoulData.Flags = soulData.Flags
-	latestChainStatisticsData.SoulData.MaxSupply = soulData.MaxSupply
-	latestChainStatisticsData.SoulData.Name = soulData.Name
-	latestChainStatisticsData.SoulData.Owner = soulData.Owner
-	latestChainStatisticsData.SoulData.Price = nil
-	latestChainStatisticsData.SoulData.Script = soulData.Script
-	latestChainStatisticsData.SoulData.Series = nil
-	latestChainStatisticsData.SoulData.Symbol = soulData.Symbol
-
-	kcalData, _ := client.GetToken("KCAL", false)
-	latestChainStatisticsData.KcalData.Address = kcalData.Address
-	latestChainStatisticsData.KcalData.BurnedSupply = kcalData.BurnedSupply
-	latestChainStatisticsData.KcalData.CurrentSupply = kcalData.CurrentSupply
-	latestChainStatisticsData.KcalData.Decimals = kcalData.Decimals
-	latestChainStatisticsData.KcalData.External = nil
-	latestChainStatisticsData.KcalData.Flags = kcalData.Flags
-	latestChainStatisticsData.KcalData.MaxSupply = kcalData.MaxSupply
-	latestChainStatisticsData.KcalData.Name = kcalData.Name
-	latestChainStatisticsData.KcalData.Owner = kcalData.Owner
-	latestChainStatisticsData.KcalData.Price = nil
-	latestChainStatisticsData.KcalData.Script = kcalData.Script
-	latestChainStatisticsData.KcalData.Series = nil
-	latestChainStatisticsData.KcalData.Symbol = kcalData.Symbol
 }

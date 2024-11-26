@@ -90,18 +90,18 @@ func buildAndShowTxes(address string, pageForFetch, pageSizeForFetch uint, conte
 	} else {
 		content.Objects = nil
 	}
-	content.Refresh()
+	// content.Refresh()
 
 	// Update the history tab with the new transactions
 	displayTransactions(transactions, totalPages, address, pageSizeForFetch, pageForFetch, content)
 
 	// Ensure historyTab is not nil and update content
-	if historyTab == nil {
-		historyTab = container.NewVBox()
-	}
+	// if historyTab == nil {
+	// 	historyTab = container.NewVBox()
+	// }
 
-	historyTab.Objects = []fyne.CanvasObject{content}
-	historyTab.Refresh()
+	// historyTab.Objects = []fyne.CanvasObject{content}
+	// historyTab.Refresh()
 }
 
 func displayTransactions(transactions []TransactionResult, totalPages uint, address string, pageSize uint, currentPage uint, content *fyne.Container) {
@@ -110,7 +110,7 @@ func displayTransactions(transactions []TransactionResult, totalPages uint, addr
 	} else {
 		content.Objects = nil
 	}
-	content.Refresh()
+	// content.Refresh()
 
 	groupedTransactions := make(map[string][]TransactionResult)
 	var sortedDates []string
@@ -279,7 +279,7 @@ func displayTransactions(transactions []TransactionResult, totalPages uint, addr
 	content.Objects = []fyne.CanvasObject{
 		container.NewBorder(nil, paginationContainer, nil, nil, pageContainer),
 	}
-	content.Refresh()
+	// content.Refresh()
 	fmt.Println("****Updated history*****", currentPage)
 }
 

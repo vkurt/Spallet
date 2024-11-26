@@ -18,6 +18,11 @@ import (
 
 // Function to show Welcome Page
 func showWelcomePage() {
+
+	latestTokenData.Token["SOUL"] = TokenData{Symbol: "SOUL"} //ensuring we always have main token data
+	latestTokenData.Token["KCAL"] = TokenData{Symbol: "KCAL"}
+	latestTokenData.Token["CROWN"] = TokenData{Symbol: "CROWN"}
+
 	welcomeMsg := widget.NewLabelWithStyle("Welcome to Spallet!", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 	humorousMsg := widget.NewLabel("So, you’ve got the soul of a crypto warrior, huh? Whether you’re riding the waves with Specky👻 or Sparky🔥, this wallet is your trusty companion in the Phantasma universe. 🐦⚡")
 	humorousMsg.Wrapping = fyne.TextWrapWord // Ensure humorous message wraps correctly
@@ -55,7 +60,7 @@ func showWelcomePage() {
 
 func featuresPage() {
 	featuresHeader := widget.NewLabelWithStyle("Features of Spallet", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-	features := widget.NewRichTextFromMarkdown("1- Bugs, it means if you found a bug its a feature \n\n2- Nicknames and badges based on Staked soul\n\n3- Account migration from manage accounts menu\n\n4- Sending assets between your accounts\n\n5- Sending assets to address book recipients\n\n6-Collecting Master rewards\n\n7- Collecting Crown rewards\n\n8-Eligibility badges\n\n9-Detailed Account information\n\n10- Showing some chain statistics\n\n11- Detailed staking information under hodling tab\n\n12- Adjustable log in time out between 3-120 min\n\n13- Send assets to only known addresses\n\n14- Wallet backup/restore from restore point menu\n\n15- Custom network settings\n\n also some other things i forget :)\n\n **What we dont have in spallet**\n\n1- Phantasma link\n\n2- Showing Nft pictures and details (go SDK limitation and my limited knowledge)\n\n3- Burning tokens\n\nsome other things i dont remember\n\n**Planned Features**\n\nI've planned some features for this wallet, like integrating Saturn Dex, but hey, I'm doing this for fun. Feel free to use it as it is. Since it's open-sourced, you can fork it and continue its development or contribute its code if you like.")
+	features := widget.NewRichTextFromMarkdown("1- Bugs, it means if you found a bug its a feature \n\n2- Nicknames and badges based on Staked soul\n\n3- Account migration from manage accounts menu\n\n4- Sending assets between your accounts\n\n5- Sending assets to address book recipients\n\n6-Collecting Master rewards\n\n7- Collecting Crown rewards\n\n8-Eligibility badges\n\n9-Detailed Account information\n\n10- Showing some chain statistics\n\n11- Detailed staking information under hodling tab\n\n12- Adjustable log in time out between 3-120 min\n\n13- Send assets to only known addresses\n\n14- Wallet backup/restore from restore point menu\n\n15- Custom network settings\n\n16- Auto update balances every 15 seconds\n\nalso some other things i forget :)\n\n **What we dont have in spallet**\n\n1- Phantasma link\n\n2- Showing Nft pictures and details (go SDK limitation and my limited knowledge)\n\n3- Burning tokens\n\nsome other things i dont remember\n\n**Planned Features**\n\nI've planned some features for this wallet, like integrating Saturn Dex, but hey, I'm doing this for fun. Feel free to use it as it is. Since it's open-sourced, you can fork it and continue its development or contribute its code if you like.")
 	features.Wrapping = fyne.TextWrapWord
 	scrollContent := container.NewVScroll(features)
 	continueBttn := widget.NewButton("Continue to wallet setup", func() {
@@ -361,8 +366,9 @@ func showWalletSetupPage(creds Credentials) {
 
 							restoreDia.Hide()
 							showUpdatingDialog()
+							fetchUserTokensInfoFromChain("", 3, true, creds)
 							dataFetch(creds)
-							mainWindow(creds, regularTokens, nftTokens)
+							mainWindow(creds)
 							closeUpdatingDialog()
 							dialog.ShowInformation("Found new data", restoreInfo, mainWindowGui)
 							startLogoutTicker(15)
@@ -449,8 +455,9 @@ func generateNewWalletPage(creds Credentials) {
 		}
 
 		showUpdatingDialog()
+		fetchUserTokensInfoFromChain("", 3, true, creds)
 		dataFetch(creds)
-		mainWindow(creds, regularTokens, nftTokens)
+		mainWindow(creds)
 		closeUpdatingDialog()
 		startLogoutTicker(15)
 
@@ -550,8 +557,9 @@ func showImportWifPage(creds Credentials) {
 			return
 		}
 		showUpdatingDialog()
+		fetchUserTokensInfoFromChain("", 3, true, creds)
 		dataFetch(creds)
-		mainWindow(creds, regularTokens, nftTokens)
+		mainWindow(creds)
 		closeUpdatingDialog()
 		startLogoutTicker(15)
 

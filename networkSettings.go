@@ -200,7 +200,7 @@ func showNetworkSettingsPage(creds Credentials) {
 			showUpdatingDialog()
 			dataFetch(creds)
 			// mainWindowGui.Canvas().Content().Refresh()
-			mainWindow(creds, regularTokens, nftTokens)
+			// mainWindow(creds)
 			closeUpdatingDialog()
 			dialog.ShowInformation("Settings Saved", "Settings Saved successfully", mainWindowGui)
 		} else {

@@ -18,13 +18,12 @@ import (
 
 var currentMainDialog dialog.Dialog
 
-func showStakingPage(content *fyne.Container, creds Credentials) {
-	var stakingInfo *fyne.Container
+func showStakingPage(creds Credentials) {
+	stakingTab.SetMinSize(fyne.NewSize(0, 525))
 	var countdownForSmRw string
 	var countdownForCrwn string
 
 	stakeFeeLimit := userSettings.DefaultGasLimit
-	feeAmount := new(big.Int).Mul(stakeFeeLimit, userSettings.GasPrice)
 
 	// Claiming Kcal stuff
 	remainedTimeForKcalGenLabel := widget.NewLabel(fmt.Sprintf("Time until next forging Ritual:\t%v", time.Duration(latestAccountData.RemainedTimeForKcalGen)*time.Second))
@@ -180,6 +179,7 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 			stakeConfirmDialog := container.NewBorder(nil, stakeDiaButtonContainer, nil, nil, container.NewVBox(StakeSoulConfirmLabel, currentSparkOutput, stakeAmountConfirm))
 			d := dialog.NewCustomWithoutButtons("Power Up Specky", stakeConfirmDialog, mainWindowGui)
 			d.Resize(fyne.NewSize(660, 300))
+			currentMainDialog.Hide()
 			currentMainDialog = d
 			d.Refresh()
 			d.Show()
@@ -258,6 +258,7 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 			collectSoulConfirmDialog := container.NewBorder(nil, collectSoulDiaButtonContainer, nil, nil, container.NewVBox(collectSoulConfirmLabel, currentSparkOutput, collectSoulAmountConfirm))
 			d := dialog.NewCustomWithoutButtons("Drain Specky for Soul", collectSoulConfirmDialog, mainWindowGui)
 			d.Resize(fyne.NewSize(660, 300))
+			currentMainDialog.Hide()
 			currentMainDialog = d
 			d.Refresh()
 			d.Show()
@@ -271,7 +272,7 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 		if latestAccountData.StakedBalances.Amount.Cmp(&accFreeSoulAmount) >= 0 {
 			stakeButton.Disable()
 		}
-		content.Refresh()
+		stakingTab.Refresh()
 		soulInput.FocusGained()
 	})
 
@@ -282,7 +283,7 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 			if accFreeSoulAmount.Cmp(&latestAccountData.StakedBalances.Amount) >= 0 {
 				collectSoulButton.Disable()
 			}
-			content.Refresh()
+			stakingTab.Refresh()
 			soulInput.FocusGained()
 		}
 	})
@@ -331,7 +332,7 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 
 		}
 
-		content.Refresh()
+		stakingTab.Refresh()
 
 	}
 
@@ -340,8 +341,10 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 	stakeSoulLabel.Wrapping = fyne.TextWrapWord
 	stakeButtonsContainer := container.NewGridWithColumns(2, stakeButton, collectSoulButton)
 	maxButtonsContainer := container.NewGridWithColumns(2, stakeMaxSoul, collectMaxSoul)
-	StakeButtonGrid := container.NewGridWithRows(2, stakeButtonsContainer, maxButtonsContainer)
-	stakeContainer := container.NewBorder(stakeSoulLabel, StakeButtonGrid, nil, nil, soulInput)
+	stakeCancelBttn := widget.NewButton("Maybe Later", func() { currentMainDialog.Hide() })
+	StakeButtonGrid := container.NewVBox(soulInput, stakeButtonsContainer, maxButtonsContainer)
+
+	stakeContainer := container.NewBorder(stakeSoulLabel, stakeCancelBttn, nil, nil, StakeButtonGrid)
 
 	// ****name  Registering things***** between 3-15 chracters+cannot start with numbers+no special chracters+lower case+no space
 	nameButtonLabel := "Forge Your Name"
@@ -414,6 +417,7 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 				collectSoulConfirmDialog := container.NewBorder(nil, registerNameDiaButtonContainer, nil, nil, container.NewVBox(registerNameConfirmLabel, registerNameInfoLabel))
 				d := dialog.NewCustomWithoutButtons("Forge a name with Specky", collectSoulConfirmDialog, mainWindowGui)
 				d.Resize(fyne.NewSize(660, 300))
+				currentMainDialog.Hide()
 				currentMainDialog = d
 				d.Refresh()
 				d.Show()
@@ -464,6 +468,7 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 				collectSoulConfirmDialog := container.NewBorder(nil, registerNameDiaButtonContainer, nil, nil, container.NewVBox(registerNameConfirmLabel, registerNameInfoLabel))
 				d := dialog.NewCustomWithoutButtons("Reforge a name with Specky", collectSoulConfirmDialog, mainWindowGui)
 				d.Resize(fyne.NewSize(660, 300))
+				currentMainDialog.Hide()
 				currentMainDialog = d
 				d.Refresh()
 				d.Show()
@@ -474,8 +479,11 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 	})
 	registerNameLabel := widget.NewLabelWithStyle("Welcome to the clan, Souldier! you are holding a Soul Supply, you're entitled to claim your on-chain name. Declare your name below and join the ranks!", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 	registerNameLabel.Wrapping = fyne.TextWrapWord
-
-	registerNameContainer := container.NewBorder(registerNameLabel, registerNameButton, nil, nil, registerNameEntry)
+	registerNameCancelBttn := widget.NewButton("Maybe Later", func() {
+		currentMainDialog.Hide()
+	})
+	registerNameGrid := container.NewVBox(registerNameLabel, registerNameEntry, registerNameButton)
+	registerNameContainer := container.NewBorder(nil, registerNameCancelBttn, nil, nil, registerNameGrid)
 
 	registerNameButton.Disable()
 	registerNameEntry.OnChanged = func(s string) {
@@ -677,12 +685,23 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 	remanedTimeForGetttingCrownLabel := widget.NewLabel(fmt.Sprintf("Coronation after:\t%s", countdownForCrwn))
 	remainedTimeForGettingSoulMasterRewardLabel := widget.NewLabel(fmt.Sprintf("Mastery Awaiting Time:\t%s", countdownForSmRw))
 
-	// Building Gui/tab
+	stakeUnstakeBttn := widget.NewButton("Drain/Power Up Specky", func() {
+		currentMainDialog = dialog.NewCustomWithoutButtons("Drain/Power Up Specky", stakeContainer, mainWindowGui)
+		currentMainDialog.Resize(fyne.NewSize(600, 340))
+		currentMainDialog.Show()
+	})
 
+	registerNameMainButton := widget.NewButton(nameButtonLabel, func() {
+		currentMainDialog = dialog.NewCustomWithoutButtons(nameButtonLabel, registerNameContainer, mainWindowGui)
+		currentMainDialog.Resize(fyne.NewSize(600, 340))
+		currentMainDialog.Show()
+	})
+
+	// Building Gui/tab
 	if latestAccountData.StakedBalances.Amount.Cmp(soulMasterThreshold) >= 0 { // if address have soulmaster show this
 		soulMasterMessage := widget.NewLabelWithStyle("Souldier, your strength and dedication have earned you a place among the elite. As a Soul Master, your commitment shines brightly, and your valor grants you the honor of Crown rewards. Hold steadfast, for your path is paved with both Mastery and Royal accolades. This is the way! 🚀👑✨", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 		soulMasterMessage.Wrapping = fyne.TextWrapWord
-		scrollableContainer := container.NewVScroll(container.NewVBox(
+		stakingTab.Content = container.NewVBox(
 			soulMasterMessage,
 			stakedBalancesLabel,
 			unclaimedBalanceLabel,
@@ -697,20 +716,15 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 			kcalClaimButton,
 			smRwrdButton,
 			crwnRwrdButton,
-			registerNameContainer,
-			stakeContainer,
-		))
-		err := checkFeeBalance(feeAmount)
-		if err != nil {
-			dialog.ShowInformation("Low energy", "This account dont have enough Kcal to fill Specky's engines\nPlease check your default fee limit/price in network settings\nor get some Kcal", mainWindowGui)
-		}
-		scrollableContainer.SetMinSize(fyne.NewSize(0, 500))
-		stakingInfo = container.NewVBox(scrollableContainer)
+
+			registerNameMainButton,
+			stakeUnstakeBttn,
+		)
 
 	} else if latestAccountData.StakedBalances.Amount.Cmp(big.NewInt(0)) > 0 { // if address just a staker show this
 		stakerMessageLabel := widget.NewLabelWithStyle("Ascend to Soul Master status, earn the Mastery Reward, and claim your Crown. Strengthen the clan, and let your legacy shine. This is the way! 🚀✨", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 		stakerMessageLabel.Wrapping = fyne.TextWrapWord
-		scrollableContainer := container.NewVScroll(container.NewVBox(
+		stakingTab.Content = container.NewVBox(
 			stakerMessageLabel,
 			stakedBalancesLabel,
 			unclaimedBalanceLabel,
@@ -720,42 +734,43 @@ func showStakingPage(content *fyne.Container, creds Credentials) {
 			remainedTimeForUnstakeLabel,
 			stakingTimeLabel,
 			kcalClaimButton,
-			registerNameContainer,
-			stakeContainer,
-		))
-		err := checkFeeBalance(feeAmount)
-		if err != nil {
-			dialog.ShowInformation("Low energy", "This account dont have enough Kcal to fill Specky's engines\nPlease check your default fee limit/price in network settings\nor get some Kcal", mainWindowGui)
-		}
-		scrollableContainer.SetMinSize(fyne.NewSize(0, 500))
-		stakingInfo = container.NewVBox(scrollableContainer)
+			registerNameMainButton,
+			stakeUnstakeBttn,
+		)
 
 	} else if accFreeSoulAmount.Cmp(minSoulStake) >= 0 { // if address not staker but have enough soul to stake show this
 		notStakerMessage := widget.NewLabelWithStyle("Warrior, you have the strength and the Soul to join the ranks of the honored. Stake your Soul, ignite your destiny, and unlock the path to the Mastery Reward. The galaxy awaits your power and courage. This is the way! 🚀✨", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 		notStakerMessage.Wrapping = fyne.TextWrapWord
-		scrollableContainer := container.NewVScroll(container.NewVBox(
+		stakingTab.Content = container.NewVBox(
 			notStakerMessage,
-			stakeContainer,
-		))
-		err := checkFeeBalance(feeAmount)
-		if err != nil {
-			dialog.ShowInformation("Low energy", "This account dont have enough Kcal to fill Specky's engines\nPlease check your default fee limit/price in network settings\nor get some Kcal", mainWindowGui)
-		}
-		scrollableContainer.SetMinSize(fyne.NewSize(0, 500))
-		stakingInfo = container.NewVBox(scrollableContainer)
+			stakeUnstakeBttn,
+		)
 
 	} else {
 
 		soullessMessage := widget.NewLabelWithStyle("Only those with enough Soul power can join the ranks of the honored clan members. Strengthen your spirit and prepare to embark on this prestigious path. The journey to greatness awaits those who possess the courage and strength. This is the way! 🚀✨", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 		soullessMessage.Wrapping = fyne.TextWrapWord
-		scrollableContainer := container.NewVScroll(container.NewVBox(
+		stakingTab.Content = container.NewVBox(
 			soullessMessage,
-		))
-		scrollableContainer.SetMinSize(fyne.NewSize(0, 500))
-		stakingInfo = container.NewVBox(scrollableContainer)
+		)
 
 	}
+	feeAmount := new(big.Int).Mul(stakeFeeLimit, userSettings.GasPrice)
+	err := checkFeeBalance(feeAmount)
+	if err != nil {
 
-	content.Objects = []fyne.CanvasObject{stakingInfo}
-	content.Refresh()
+		kcalClaimButton.Disable()
+		smRwrdButton.Disable()
+		crwnRwrdButton.Disable()
+
+		stakeUnstakeBttn.Disable()
+
+		registerNameMainButton.Disable()
+
+	}
+	x, y := stakingTab.Offset.Components()
+
+	stakingTab.Refresh()
+	stakingTab.Offset = fyne.NewPos(x, y)
+
 }

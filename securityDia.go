@@ -104,7 +104,7 @@ func openSecurityDia(creds Credentials) {
 						dialog.ShowInformation("Error", "Failed to save settings: "+err.Error(), mainWindowGui)
 						return
 					}
-					mainWindow(creds, regularTokens, nftTokens)
+					mainWindow(creds)
 					currentMainDialog.Hide()
 					dialog.ShowInformation("Settings saved", "Password Changed\nSettings saved", mainWindowGui)
 				}

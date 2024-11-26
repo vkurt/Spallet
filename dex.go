@@ -21,7 +21,7 @@ import (
 
 var dexGasLimit = big.NewInt(30000)
 
-func createDexContent(creds Credentials) *fyne.Container {
+func createDexContent(creds Credentials) *container.Scroll {
 	amountInBinding := binding.NewString()
 	slippageBinding := binding.NewString()
 	slippageBinding.Set("0.5") // Default slippage
@@ -113,8 +113,8 @@ func createDexContent(creds Credentials) *fyne.Container {
 		swapBtn,
 		widget.NewRichTextFromMarkdown("Powered by [Saturn Dex](https://saturn.stellargate.io/)"),
 	)
-
-	return container.NewPadded(form)
+	dexTab.Content = container.NewPadded(form)
+	return dexTab
 }
 
 func executeSwap(tokenIn, tokenOut string, amountIn *big.Int, slippageTolerance float64, creds Credentials) error {
@@ -201,7 +201,7 @@ func executeSwap(tokenIn, tokenOut string, amountIn *big.Int, slippageTolerance 
 func monitorSwapTransaction(txHash string) {
 	maxRetries := 30
 	retryCount := 0
-	retryDelay := time.Second * 5
+	retryDelay := time.Millisecond * 500
 
 	fmt.Printf("Starting transaction monitoring for hash: %s\n", txHash)
 
