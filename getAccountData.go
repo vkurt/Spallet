@@ -21,7 +21,7 @@ var latestAccountData = AccountInfoData{
 }
 var lastCountdownUpdate int64
 
-func getAccountData(walletAddress string, creds Credentials, override bool) error {
+func getAccountData(walletAddress string, creds Credentials) error {
 	currentUtcTime := time.Now().UTC()
 	passedTime := currentUtcTime.Unix() - latestAccountData.StatCheckTime
 	fetchAccData := false
@@ -43,14 +43,27 @@ func getAccountData(walletAddress string, creds Credentials, override bool) erro
 	fmt.Println("acctxcount ", latestAccountData.TransactionCount)
 	fmt.Println("actualTxCount", actualTxCount)
 
-	if latestAccountData.Address == walletAddress && actualTxCount != latestAccountData.TransactionCount { // trying to prevent fetch data too often
+	if latestAccountData.Address == walletAddress && actualTxCount != latestAccountData.TransactionCount && latestAccountData.Network == userSettings.NetworkName { // fetch acount data tx count changed, network changed, on wallet change
 		fetchAccData = true
 		latestAccountData = AccountInfoData{
 			FungibleTokens: make(map[string]AccToken),
 			NonFungible:    make(map[string]AccToken),
 		}
 
-	} else if latestAccountData.Address != walletAddress || latestAccountData.Network != userSettings.NetworkName {
+	} else if latestAccountData.Network != userSettings.NetworkName {
+		fetchAccData = true
+		latestAccountData = AccountInfoData{
+			FungibleTokens: make(map[string]AccToken),
+			NonFungible:    make(map[string]AccToken),
+		}
+		latestTokenData = UpdatedTokenData{
+			AllTokenUpdateTime:   currentUtcTime.Unix() - 135,
+			ChainTokenUpdateTime: currentUtcTime.Unix() - 135,
+			AccTokenUpdateTime:   currentUtcTime.Unix(),
+			Token:                make(map[string]TokenData),
+		}
+		loadTokenCache()
+	} else if latestAccountData.Address != walletAddress {
 		fetchAccData = true
 		latestAccountData = AccountInfoData{
 			FungibleTokens: make(map[string]AccToken),
@@ -75,7 +88,8 @@ func getAccountData(walletAddress string, creds Credentials, override bool) erro
 			latestAccountData.RemainedTimeForKcalGen -= passed
 
 		} else {
-			latestAccountData.RemainedTimeForKcalGen = 0
+			latestAccountData.RemainedTimeForKcalGen = 86400 + latestAccountData.RemainedTimeForKcalGen - passed
+			latestAccountData.StakedBalances.Unclaimed = *new(big.Int).Add(&latestAccountData.KcalDailyProd, &latestAccountData.StakedBalances.Unclaimed)
 
 		}
 
@@ -92,7 +106,7 @@ func getAccountData(walletAddress string, creds Credentials, override bool) erro
 
 	}
 
-	if fetchAccData || override {
+	if fetchAccData {
 		lastCountdownUpdate = currentUtcTime.Unix()
 		latestAccountData.StatCheckTime = currentUtcTime.Unix()
 		latestAccountData.Address = walletAddress
@@ -156,7 +170,7 @@ func getAccountData(walletAddress string, creds Credentials, override bool) erro
 			amountBig := StringToBigInt(token.Amount)
 
 			if len(token.Ids) == 0 {
-				ftTokenData, _ := fetchUserTokensInfoFromChain(token.Symbol, 3, false, creds)
+				ftTokenData, _ := updateOrCheckCache(token.Symbol, 3, "check")
 				fungible := AccToken{
 					Symbol:        token.Symbol,
 					Name:          ftTokenData.Name,
@@ -189,7 +203,7 @@ func getAccountData(walletAddress string, creds Credentials, override bool) erro
 
 				latestAccountData.FungibleTokens[token.Symbol] = fungible
 			} else {
-				nftTokenData, _ := fetchUserTokensInfoFromChain(token.Symbol, 3, false, creds)
+				nftTokenData, _ := updateOrCheckCache(token.Symbol, 3, "check")
 				nonFungible := AccToken{
 					Symbol:        token.Symbol,
 					Name:          nftTokenData.Name,
@@ -382,6 +396,7 @@ func getAccountData(walletAddress string, creds Credentials, override bool) erro
 		}
 
 		buildAndShowAccInfo(creds)
+		buildBadges()
 		showStakingPage(creds)
 
 	}

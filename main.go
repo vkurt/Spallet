@@ -15,7 +15,6 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/phantasma-io/phantasma-go/pkg/rpc/response"
 )
 
 type Wallet struct {
@@ -36,8 +35,6 @@ type Stake struct {
 	Time      uint
 	Unclaimed big.Int
 }
-
-var transactions []response.TransactionResult
 
 // var (
 //
@@ -181,9 +178,11 @@ func showExistingUserLogin() {
 			}
 			autoUpdate(updateInterval, creds)
 			showUpdatingDialog()
-			loadSettings("data/essential/settings.spallet")                // Load settings at startup
-			loadTokenCache(creds)                                          // this will update  tokens data from cache if user dont dave cache yet it will create one with main tokens
-			latestTokenData.LastUpdateTime = time.Now().UTC().Unix() - 135 // we will update data automaticaly 15 sec after login with auto update
+			loadSettings("data/essential/settings.spallet")                       // Load settings at startup
+			loadTokenCache()                                                      // this will update  tokens data from cache if user dont dave cache yet it will create one with main tokens
+			latestTokenData.ChainTokenUpdateTime = time.Now().UTC().Unix() - 3584 // we will update data automaticaly 15 sec after login with auto update
+			latestTokenData.AllTokenUpdateTime = time.Now().UTC().Unix()
+			latestTokenData.AccTokenUpdateTime = time.Now().UTC().Unix()
 			var foundWalletNumber = 0
 			var listedWallets = len(creds.WalletOrder)
 			for _, found := range creds.Wallets { //check if there is a unvisible wallet we have

@@ -52,6 +52,7 @@ func manageAccountsDia(creds Credentials) {
 				}
 				buildWalletButtons()
 				walletScroll.Content.Refresh()
+
 			}
 		}
 
@@ -64,6 +65,7 @@ func manageAccountsDia(creds Credentials) {
 				}
 				buildWalletButtons()
 				walletScroll.Content.Refresh()
+
 			}
 		}
 
@@ -77,6 +79,7 @@ func manageAccountsDia(creds Credentials) {
 			}
 			buildWalletButtons()
 			walletScroll.Content.Refresh()
+
 		}
 
 		moveBottom := func(index int) {
@@ -89,6 +92,7 @@ func manageAccountsDia(creds Credentials) {
 			}
 			buildWalletButtons()
 			walletScroll.Content.Refresh()
+
 		}
 
 		buildWalletButtons = func() {
@@ -173,6 +177,7 @@ func manageAccountsDia(creds Credentials) {
 						manageAccCurrDia = dialog.NewInformation("Succesfully saved", fmt.Sprintf("New name saved for '%s' as '%s'", wallet.Address, renameEntry.Text), mainWindowGui)
 						buildWalletButtons()
 						walletScroll.Content.Refresh()
+
 					})
 					backBttn := widget.NewButton("Back", func() {
 						manageAccCurrDia.Hide()
@@ -1018,6 +1023,7 @@ func manageAccountsDia(creds Credentials) {
 						manageAccCurrDia.Show()
 						buildWalletButtons()
 						walletScroll.Content.Refresh()
+
 					}
 				}
 			}, mainWindowGui)
@@ -1088,23 +1094,27 @@ func manageAccountsDia(creds Credentials) {
 						manageAccCurrDia.Show()
 						buildWalletButtons()
 						walletScroll.Content.Refresh()
+
 					}
 				}
 			}, mainWindowGui)
 			manageAccCurrDia.Show()
 			nameEntry.CursorRow = len(nameEntry.Text)
 			nameEntry.FocusGained()
-			nameEntry.Keyboard()
+
 		})
 
 		backButton := widget.NewButton("Back", func() {
-			// mainWindow(creds)
+			mainWindow(creds)
 			currentMainDialog.Hide()
 		})
 
 		accountsLayout := container.NewBorder(walletScroll, container.NewVBox(addWallet, generateAccount, backButton), nil, nil)
-		dia := dialog.NewCustomWithoutButtons("Manage Your Accounts", accountsLayout, mainWindowGui)
-		currentMainDialog = dia
+		if currentMainDialog != nil {
+			currentMainDialog.Hide()
+		}
+		currentMainDialog = dialog.NewCustomWithoutButtons("Manage Your Accounts", accountsLayout, mainWindowGui)
+
 		currentMainDialog.Show()
 	})
 

@@ -20,6 +20,8 @@ var lgnTmeOutMnt = 15
 
 var logoutTicker *time.Ticker
 
+var pwdDia dialog.Dialog
+
 func startLogoutTicker(timeout int) {
 	if logoutTicker != nil {
 		logoutTicker.Stop()
@@ -40,292 +42,294 @@ func startLogoutTicker(timeout int) {
 }
 
 func openSecurityDia(creds Credentials) {
-	pwd := widget.NewPasswordEntry()
+	// pwd := widget.NewPasswordEntry()
 	var pwdLen int
 	var askPwd = userSettings.AskPwd
-	errorLabel := widget.NewLabel("")
-	security := dialog.NewForm("Dangerous area!", "Confirm", "Cancel", []*widget.FormItem{
-		widget.NewFormItem("", widget.NewLabelWithStyle("Please enter your password", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})),
-		widget.NewFormItem("", pwd),
-		widget.NewFormItem("", errorLabel),
-	}, func(b bool) {
-		if b && creds.Password == pwd.Text {
-			newPwdBindFrst := ""
-			newPwdBind := binding.BindString(&newPwdBindFrst)
-			newPwd := widget.NewEntryWithData(newPwdBind)
-			newPwd.PlaceHolder = "Leave it empty if you don't want to change"
-			newPwd.Password = true
-			newPwdCnfrmfrst := ""
-			newPwdCnfrmBind := binding.BindString(&newPwdCnfrmfrst)
-			newPwdCnfrm := widget.NewEntryWithData(newPwdCnfrmBind)
-			newPwdCnfrm.Password = true
-			lgnTmeOut := widget.NewEntry()
-			lgnTmeOutMntStr := strconv.Itoa(lgnTmeOutMnt)
-			lgnTmeOut.SetText(lgnTmeOutMntStr)
-			var settingsChanged func()
-			sendOnlyKnown := userSettings.SendOnly
+	askPwdDia(true, creds.Password, mainWindowGui, func(correct bool) {
+		fmt.Println("result", correct)
+		if !correct {
+			return
+		}
+		newPwdBindFrst := ""
+		newPwdBind := binding.BindString(&newPwdBindFrst)
+		newPwd := widget.NewEntryWithData(newPwdBind)
+		newPwd.PlaceHolder = "Leave it empty if you don't want to change"
+		newPwd.Password = true
+		newPwdCnfrmfrst := ""
+		newPwdCnfrmBind := binding.BindString(&newPwdCnfrmfrst)
+		newPwdCnfrm := widget.NewEntryWithData(newPwdCnfrmBind)
+		newPwdCnfrm.Password = true
+		lgnTmeOut := widget.NewEntry()
+		lgnTmeOutMntStr := strconv.Itoa(lgnTmeOutMnt)
+		lgnTmeOut.SetText(lgnTmeOutMntStr)
+		var settingsChanged func()
+		sendOnlyKnown := userSettings.SendOnly
 
-			var securityForm *widget.Form
+		var securityForm *widget.Form
 
-			// fmt.Println("askPwd", askPwd)
-			var tmeOutValid, pwdValid, pwdCnfmValid bool
-			saveBttn := widget.NewButtonWithIcon("", theme.ConfirmIcon(), func() {
-				lgnTmeOutMnt, _ = strconv.Atoi(lgnTmeOut.Text)
-				if len(newPwdCnfrm.Text) < 6 || len(newPwd.Text) < 6 || newPwdCnfrm.Text != newPwd.Text {
-					userSettings.AskPwd = askPwd
-					userSettings.LgnTmeOut = lgnTmeOutMnt
-					userSettings.SendOnly = sendOnlyKnown
-					if err := saveSettings(); err != nil {
-						log.Println("Failed to save settings:", err)
-						dialog.ShowInformation("Error", "Failed to save settings: "+err.Error(), mainWindowGui)
-						return
-					}
-					currentMainDialog.Hide()
-					dialog.ShowInformation("Settings saved", "Password not Changed\nSettings saved", mainWindowGui)
-				} else {
-					creds.Password = newPwdCnfrm.Text
-					if err := saveCredentials(creds); err != nil {
-						log.Println("Failed to save credentials:", err)
-						dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
-						return
-					}
-
-					if err := saveAddressBook(userAddressBook, newPwdCnfrm.Text); err != nil {
-						log.Println("Failed to save address book:", err)
-						dialog.ShowInformation("Error", "Failed to save address book: "+err.Error(), mainWindowGui)
-						return
-					}
-
-					userSettings.AskPwd = askPwd
-					userSettings.LgnTmeOut = lgnTmeOutMnt
-					userSettings.SendOnly = sendOnlyKnown
-					if err := saveSettings(); err != nil {
-						log.Println("Failed to save settings:", err)
-						dialog.ShowInformation("Error", "Failed to save settings: "+err.Error(), mainWindowGui)
-						return
-					}
-					mainWindow(creds)
-					currentMainDialog.Hide()
-					dialog.ShowInformation("Settings saved", "Password Changed\nSettings saved", mainWindowGui)
+		// fmt.Println("askPwd", askPwd)
+		var tmeOutValid, pwdValid, pwdCnfmValid bool
+		saveBttn := widget.NewButtonWithIcon("", theme.ConfirmIcon(), func() {
+			lgnTmeOutMnt, _ = strconv.Atoi(lgnTmeOut.Text)
+			if len(newPwdCnfrm.Text) < 6 || len(newPwd.Text) < 6 || newPwdCnfrm.Text != newPwd.Text {
+				userSettings.AskPwd = askPwd
+				userSettings.LgnTmeOut = lgnTmeOutMnt
+				userSettings.SendOnly = sendOnlyKnown
+				if err := saveSettings(); err != nil {
+					log.Println("Failed to save settings:", err)
+					dialog.ShowInformation("Error", "Failed to save settings: "+err.Error(), mainWindowGui)
+					return
 				}
-			})
-			saveBttn.Disable()
-
-			lgnTmeOutFrmItm := widget.NewFormItem("Login Time Out", container.New(layout.NewHBoxLayout(), lgnTmeOut, widget.NewLabel("Minutes (min 3 max 120)"), layout.NewSpacer()))
-			lgnTmeOutFrmItm.HintText = "."
-
-			settingsChanged = func() {
-				if lgnTmeOutMntStr == lgnTmeOut.Text && askPwd == userSettings.AskPwd && userSettings.SendOnly == sendOnlyKnown && pwdLen < 6 {
-					fmt.Println("Settings not changed")
-					saveBttn.Disable()
-				} else if !pwdValid || !tmeOutValid || !pwdCnfmValid {
-					fmt.Println("Something is wrong", pwdValid, tmeOutValid, pwdCnfmValid)
-					saveBttn.Disable()
-				} else if pwdValid && tmeOutValid && pwdCnfmValid {
-					saveBttn.Enable()
-				}
-			}
-			sendOnlyKnownChck := widget.NewCheck("Send assets only known addresses", func(b bool) {
-				if b {
-					sendOnlyKnown = true
-					settingsChanged()
-				} else {
-					sendOnlyKnown = false
-					settingsChanged()
-				}
-
-			})
-			sendOnlyKnownChck.Checked = userSettings.SendOnly
-
-			lgnTmeOut.Validator = func(s string) error {
-				noSpaces := !regexp.MustCompile(`\s`).MatchString(s)
-				matched, _ := regexp.MatchString("[0-9]", s)
-
-				if !noSpaces {
-					tmeOutValid = false
-					settingsChanged()
-					lgnTmeOutFrmItm.HintText = "contains space"
-					securityForm.Refresh()
-					return fmt.Errorf("contains space")
-				} else if !matched {
-					tmeOutValid = false
-					settingsChanged()
-					lgnTmeOutFrmItm.HintText = "only numbers"
-					securityForm.Refresh()
-					return fmt.Errorf("only numbers")
-				}
-
-				value, _ := strconv.Atoi(s)
-
-				if value < 3 {
-					tmeOutValid = false
-					settingsChanged()
-					lgnTmeOutFrmItm.HintText = "min 3"
-					securityForm.Refresh()
-					return fmt.Errorf("min 3")
-				} else if value > 120 {
-					tmeOutValid = false
-					settingsChanged()
-					lgnTmeOutFrmItm.HintText = "max 120"
-					securityForm.Refresh()
-					return fmt.Errorf("max 120")
-				} else {
-					tmeOutValid = true
-
-					lgnTmeOutFrmItm.HintText = ""
-					securityForm.Refresh()
-					settingsChanged() // Call when valid
-					return nil
-				}
-			}
-
-			newPwd.Validator = func(s string) error {
-				pwdLen = len(s)
-				if len(s) < 1 && len(newPwdCnfrm.Text) < 1 {
-					newPwdCnfrm.SetValidationError(nil)
-					pwdCnfmValid = true
-					pwdValid = true
-					settingsChanged()
-					return nil
-				} else if len(s) < 6 {
-					pwdValid = false
-					settingsChanged()
-					return fmt.Errorf("min 6 characters")
-				} else {
-					err := newPwdCnfrm.Validate()
-					if err != nil {
-						pwdValid = false
-						newPwdCnfrm.SetValidationError(fmt.Errorf("please confirm"))
-						settingsChanged()
-						return fmt.Errorf("confirm password")
-					}
-					pwdValid = true
-					settingsChanged()
-					return nil
-				}
-			}
-
-			newPwdCnfrm.Validator = func(s string) error {
-				newPwdEntry, _ := newPwdBind.Get()
-				newPwdCnfrmEntry, _ := newPwdCnfrmBind.Get()
-				// fmt.Println("newPwdCnfrm validation", newPwdEntry, newPwdCnfrmEntry)
-				if len(newPwdEntry) < 1 && len(s) < 1 {
-					pwdCnfmValid = true
-					pwdValid = true
-					newPwd.SetValidationError(nil)
-					settingsChanged()
-					return nil
-				} else if len(s) < 6 {
-					pwdCnfmValid = false
-					settingsChanged()
-					return fmt.Errorf("min 6 characters")
-				} else {
-					_, err := pwdMatch(newPwdEntry, newPwdCnfrmEntry)
-					if err != nil {
-						pwdCnfmValid = false
-						settingsChanged()
-						return err
-					} else {
-						newPwd.SetValidationError(nil)
-						pwdCnfmValid = true
-						pwdValid = true
-						settingsChanged()
-						return nil
-					}
-				}
-			}
-			pwdAskAll := askPwd
-			pwdAskOnly := !askPwd
-			pwdAskAllBind := binding.BindBool(&pwdAskAll)
-			pwdAskAllCheck := widget.NewCheckWithData("for everything", pwdAskAllBind)
-			pwdaskLgnBind := binding.BindBool(&pwdAskOnly)
-			pwdAskLgnCheck := widget.NewCheckWithData("only on login", pwdaskLgnBind)
-
-			pwdAskLgnCheck.OnChanged = func(b bool) {
-				if b {
-					pwdAskAll = false
-					pwdAskOnly = true
-					pwdAskAllCheck.Checked = false
-					pwdAskAllCheck.Refresh()
-					askPwd = false
-					settingsChanged() // Call when changed
-				} else {
-					pwdAskAll = true
-					pwdAskOnly = false
-					pwdAskAllCheck.Checked = true
-					pwdAskAllCheck.Refresh()
-					askPwd = true
-					settingsChanged() // Call when changed
-				}
-			}
-			pwdAskAllCheck.OnChanged = func(b bool) {
-				if b {
-					pwdAskAll = true
-					pwdAskOnly = false
-					pwdAskLgnCheck.Checked = false
-					pwdAskLgnCheck.Refresh()
-					askPwd = true
-					settingsChanged() // Call when changed
-				} else {
-					pwdAskAll = false
-					pwdAskOnly = true
-					pwdAskLgnCheck.Checked = true
-					pwdAskLgnCheck.Refresh()
-					askPwd = false
-					settingsChanged() // Call when changed
-				}
-			}
-
-			PwdAskTypeChecks := container.New(layout.NewHBoxLayout(), pwdAskAllCheck, pwdAskLgnCheck, layout.NewSpacer())
-
-			securityForm = widget.NewForm(
-				widget.NewFormItem("New Password", newPwd),
-				widget.NewFormItem("Confirm", newPwdCnfrm),
-				widget.NewFormItem("Ask Password", PwdAskTypeChecks),
-				widget.NewFormItem("", sendOnlyKnownChck),
-				lgnTmeOutFrmItm,
-			)
-
-			exitBttn := widget.NewButtonWithIcon("", theme.WindowCloseIcon(), func() {
 				currentMainDialog.Hide()
-			})
+				dialog.ShowInformation("Settings saved", "Password not Changed\nSettings saved", mainWindowGui)
+			} else {
+				creds.Password = newPwdCnfrm.Text
+				if err := saveCredentials(creds); err != nil {
+					log.Println("Failed to save credentials:", err)
+					dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
+					return
+				}
 
-			// securityForm.SetOnValidationChanged(func(err error) {
-			// 	if err == nil {
-			// 		pwdValid = true
-			// 		settingsChanged()
-			// 	} else {
-			// 		pwdValid = false
-			// 		settingsChanged()
-			// 	}
+				if err := saveAddressBook(userAddressBook, newPwdCnfrm.Text); err != nil {
+					log.Println("Failed to save address book:", err)
+					dialog.ShowInformation("Error", "Failed to save address book: "+err.Error(), mainWindowGui)
+					return
+				}
 
-			// })
+				userSettings.AskPwd = askPwd
+				userSettings.LgnTmeOut = lgnTmeOutMnt
+				userSettings.SendOnly = sendOnlyKnown
+				if err := saveSettings(); err != nil {
+					log.Println("Failed to save settings:", err)
+					dialog.ShowInformation("Error", "Failed to save settings: "+err.Error(), mainWindowGui)
+					return
+				}
+				mainWindow(creds)
+				currentMainDialog.Hide()
+				dialog.ShowInformation("Settings saved", "Password Changed\nSettings saved", mainWindowGui)
+			}
+		})
+		saveBttn.Disable()
 
-			securityFormContent := container.NewVScroll(securityForm)
-			securityButtons := container.NewGridWithColumns(2, exitBttn, saveBttn)
-			securityFormLayout := container.NewBorder(nil, securityButtons, nil, nil, securityFormContent)
-			securityFormDia := dialog.NewCustomWithoutButtons("Security settings", securityFormLayout, mainWindowGui)
-			currentMainDialog = securityFormDia
-			currentMainDialog.Resize(fyne.NewSize(600, 345))
-			currentMainDialog.Show()
+		lgnTmeOutFrmItm := widget.NewFormItem("Login Time Out", container.New(layout.NewHBoxLayout(), lgnTmeOut, widget.NewLabel("Minutes (min 3 max 120)"), layout.NewSpacer()))
+		lgnTmeOutFrmItm.HintText = "."
 
-		} else if b && creds.Password != pwd.Text {
-			currentMainDialog.Hide()
-			errorLabel.SetText("Password is invalid!")
-			currentMainDialog.Show()
+		settingsChanged = func() {
+			if lgnTmeOutMntStr == lgnTmeOut.Text && askPwd == userSettings.AskPwd && userSettings.SendOnly == sendOnlyKnown && pwdLen < 6 {
+				fmt.Println("Settings not changed")
+				saveBttn.Disable()
+			} else if !pwdValid || !tmeOutValid || !pwdCnfmValid {
+				fmt.Println("Something is wrong", pwdValid, tmeOutValid, pwdCnfmValid)
+				saveBttn.Disable()
+			} else if pwdValid && tmeOutValid && pwdCnfmValid {
+				saveBttn.Enable()
+			}
+		}
+		sendOnlyKnownChck := widget.NewCheck("Send assets only known addresses", func(b bool) {
+			if b {
+				sendOnlyKnown = true
+				settingsChanged()
+			} else {
+				sendOnlyKnown = false
+				settingsChanged()
+			}
+
+		})
+		sendOnlyKnownChck.Checked = userSettings.SendOnly
+
+		lgnTmeOut.Validator = func(s string) error {
+			noSpaces := !regexp.MustCompile(`\s`).MatchString(s)
+			matched, _ := regexp.MatchString("[0-9]", s)
+
+			if !noSpaces {
+				tmeOutValid = false
+				settingsChanged()
+				lgnTmeOutFrmItm.HintText = "contains space"
+				securityForm.Refresh()
+				return fmt.Errorf("contains space")
+			} else if !matched {
+				tmeOutValid = false
+				settingsChanged()
+				lgnTmeOutFrmItm.HintText = "only numbers"
+				securityForm.Refresh()
+				return fmt.Errorf("only numbers")
+			}
+
+			value, _ := strconv.Atoi(s)
+
+			if value < 3 {
+				tmeOutValid = false
+				settingsChanged()
+				lgnTmeOutFrmItm.HintText = "min 3"
+				securityForm.Refresh()
+				return fmt.Errorf("min 3")
+			} else if value > 120 {
+				tmeOutValid = false
+				settingsChanged()
+				lgnTmeOutFrmItm.HintText = "max 120"
+				securityForm.Refresh()
+				return fmt.Errorf("max 120")
+			} else {
+				tmeOutValid = true
+
+				lgnTmeOutFrmItm.HintText = ""
+				securityForm.Refresh()
+				settingsChanged() // Call when valid
+				return nil
+			}
 		}
 
-	}, mainWindowGui)
-	security.Resize(fyne.NewSize(368, 207))
-	currentMainDialog = security
-	currentMainDialog.Show()
-	mainWindowGui.Canvas().Focus(pwd)
+		newPwd.Validator = func(s string) error {
+			pwdLen = len(s)
+			if len(s) < 1 && len(newPwdCnfrm.Text) < 1 {
+				newPwdCnfrm.SetValidationError(nil)
+				pwdCnfmValid = true
+				pwdValid = true
+				settingsChanged()
+				return nil
+			} else if len(s) < 6 {
+				pwdValid = false
+				settingsChanged()
+				return fmt.Errorf("min 6 characters")
+			} else {
+				err := newPwdCnfrm.Validate()
+				if err != nil {
+					pwdValid = false
+					newPwdCnfrm.SetValidationError(fmt.Errorf("please confirm"))
+					settingsChanged()
+					return fmt.Errorf("confirm password")
+				}
+				pwdValid = true
+				settingsChanged()
+				return nil
+			}
+		}
+
+		newPwdCnfrm.Validator = func(s string) error {
+			newPwdEntry, _ := newPwdBind.Get()
+			newPwdCnfrmEntry, _ := newPwdCnfrmBind.Get()
+			// fmt.Println("newPwdCnfrm validation", newPwdEntry, newPwdCnfrmEntry)
+			if len(newPwdEntry) < 1 && len(s) < 1 {
+				pwdCnfmValid = true
+				pwdValid = true
+				newPwd.SetValidationError(nil)
+				settingsChanged()
+				return nil
+			} else if len(s) < 6 {
+				pwdCnfmValid = false
+				settingsChanged()
+				return fmt.Errorf("min 6 characters")
+			} else {
+				_, err := pwdMatch(newPwdEntry, newPwdCnfrmEntry)
+				if err != nil {
+					pwdCnfmValid = false
+					settingsChanged()
+					return err
+				} else {
+					newPwd.SetValidationError(nil)
+					pwdCnfmValid = true
+					pwdValid = true
+					settingsChanged()
+					return nil
+				}
+			}
+		}
+		pwdAskAll := askPwd
+		pwdAskOnly := !askPwd
+		pwdAskAllBind := binding.BindBool(&pwdAskAll)
+		pwdAskAllCheck := widget.NewCheckWithData("for everything", pwdAskAllBind)
+		pwdaskLgnBind := binding.BindBool(&pwdAskOnly)
+		pwdAskLgnCheck := widget.NewCheckWithData("only on login", pwdaskLgnBind)
+
+		pwdAskLgnCheck.OnChanged = func(b bool) {
+			if b {
+				pwdAskAll = false
+				pwdAskOnly = true
+				pwdAskAllCheck.Checked = false
+				pwdAskAllCheck.Refresh()
+				askPwd = false
+				settingsChanged() // Call when changed
+			} else {
+				pwdAskAll = true
+				pwdAskOnly = false
+				pwdAskAllCheck.Checked = true
+				pwdAskAllCheck.Refresh()
+				askPwd = true
+				settingsChanged() // Call when changed
+			}
+		}
+		pwdAskAllCheck.OnChanged = func(b bool) {
+			if b {
+				pwdAskAll = true
+				pwdAskOnly = false
+				pwdAskLgnCheck.Checked = false
+				pwdAskLgnCheck.Refresh()
+				askPwd = true
+				settingsChanged() // Call when changed
+			} else {
+				pwdAskAll = false
+				pwdAskOnly = true
+				pwdAskLgnCheck.Checked = true
+				pwdAskLgnCheck.Refresh()
+				askPwd = false
+				settingsChanged() // Call when changed
+			}
+		}
+
+		PwdAskTypeChecks := container.New(layout.NewHBoxLayout(), pwdAskAllCheck, pwdAskLgnCheck, layout.NewSpacer())
+
+		securityForm = widget.NewForm(
+			widget.NewFormItem("New Password", newPwd),
+			widget.NewFormItem("Confirm", newPwdCnfrm),
+			widget.NewFormItem("Ask Password", PwdAskTypeChecks),
+			widget.NewFormItem("", sendOnlyKnownChck),
+			lgnTmeOutFrmItm,
+		)
+
+		exitBttn := widget.NewButtonWithIcon("", theme.WindowCloseIcon(), func() {
+			currentMainDialog.Hide()
+		})
+
+		// securityForm.SetOnValidationChanged(func(err error) {
+		// 	if err == nil {
+		// 		pwdValid = true
+		// 		settingsChanged()
+		// 	} else {
+		// 		pwdValid = false
+		// 		settingsChanged()
+		// 	}
+
+		// })
+
+		securityFormContent := container.NewVScroll(securityForm)
+		securityButtons := container.NewGridWithColumns(2, exitBttn, saveBttn)
+		securityFormLayout := container.NewBorder(nil, securityButtons, nil, nil, securityFormContent)
+		securityFormDia := dialog.NewCustomWithoutButtons("Security settings", securityFormLayout, mainWindowGui)
+		currentMainDialog = securityFormDia
+		currentMainDialog.Resize(fyne.NewSize(600, 345))
+		currentMainDialog.Show()
+
+	})
 }
 
 func askPwdDia(askPwd bool, pwd string, mainWindow fyne.Window, callback func(bool)) {
 	if askPwd {
 		pwdEntry := widget.NewPasswordEntry()
 		errorLabel := widget.NewLabel("")
+
+		pwdEntry.OnSubmitted = func(s string) {
+			if s == pwd {
+				pwdDia.Hide()
+				callback(true)
+				return
+			} else {
+				pwdDia.Hide()
+				errorLabel.SetText("Password is invalid!")
+				pwdDia.Show()
+				mainWindow.Canvas().Focus(pwdEntry)
+
+			}
+		}
 
 		form := dialog.NewCustomConfirm("Dangerous area!", "Confirm", "Cancel",
 			container.NewVBox(
@@ -338,16 +342,18 @@ func askPwdDia(askPwd bool, pwd string, mainWindow fyne.Window, callback func(bo
 						callback(true)
 						return
 					} else {
+						pwdDia.Hide()
 						errorLabel.SetText("Password is invalid!")
-						currentMainDialog.Show()
+						pwdDia.Show()
+						mainWindow.Canvas().Focus(pwdEntry)
 
 					}
 				}
 				callback(false)
 			}, mainWindow)
-		currentMainDialog = form
-		currentMainDialog.Resize(fyne.NewSize(368, 207))
-		currentMainDialog.Show()
+		pwdDia = form
+		pwdDia.Resize(fyne.NewSize(368, 207))
+		pwdDia.Show()
 		mainWindow.Canvas().Focus(pwdEntry)
 	} else {
 		callback(true)

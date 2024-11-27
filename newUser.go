@@ -19,9 +19,7 @@ import (
 // Function to show Welcome Page
 func showWelcomePage() {
 
-	latestTokenData.Token["SOUL"] = TokenData{Symbol: "SOUL"} //ensuring we always have main token data
-	latestTokenData.Token["KCAL"] = TokenData{Symbol: "KCAL"}
-	latestTokenData.Token["CROWN"] = TokenData{Symbol: "CROWN"}
+	updateOrCheckCache("", 3, "chain")
 
 	welcomeMsg := widget.NewLabelWithStyle("Welcome to Spallet!", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 	humorousMsg := widget.NewLabel("So, you’ve got the soul of a crypto warrior, huh? Whether you’re riding the waves with Specky👻 or Sparky🔥, this wallet is your trusty companion in the Phantasma universe. 🐦⚡")
@@ -366,7 +364,7 @@ func showWalletSetupPage(creds Credentials) {
 
 							restoreDia.Hide()
 							showUpdatingDialog()
-							fetchUserTokensInfoFromChain("", 3, true, creds)
+
 							dataFetch(creds)
 							mainWindow(creds)
 							closeUpdatingDialog()
@@ -455,7 +453,7 @@ func generateNewWalletPage(creds Credentials) {
 		}
 
 		showUpdatingDialog()
-		fetchUserTokensInfoFromChain("", 3, true, creds)
+
 		dataFetch(creds)
 		mainWindow(creds)
 		closeUpdatingDialog()
@@ -557,7 +555,7 @@ func showImportWifPage(creds Credentials) {
 			return
 		}
 		showUpdatingDialog()
-		fetchUserTokensInfoFromChain("", 3, true, creds)
+
 		dataFetch(creds)
 		mainWindow(creds)
 		closeUpdatingDialog()

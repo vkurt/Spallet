@@ -80,8 +80,6 @@ func buildAndShowAccInfo(creds Credentials) {
 
 	}
 
-	buildBadges()
-
 	accSummaryInfo := fmt.Sprintf("Local Name:\t%s\nOn Chain Name:\t%v\nNick name:\t\t%v\nAddress:\t\t%s\nHave %v token(s), %v NFT(s) from %v collections",
 		creds.LastSelectedWallet, latestAccountData.OnChainName, latestAccountData.NickName, creds.Wallets[creds.LastSelectedWallet].Address, latestAccountData.TokenCount, latestAccountData.TotalNft, latestAccountData.NftTypes)
 

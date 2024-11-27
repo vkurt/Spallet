@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
+	"github.com/phantasma-io/phantasma-go/pkg/rpc/response"
 )
 
 type TokenData struct {
@@ -50,8 +51,10 @@ type AccToken struct {
 }
 
 type UpdatedTokenData struct {
-	LastUpdateTime int64                `json:"last_update_time"`
-	Token          map[string]TokenData `json:"token"`
+	ChainTokenUpdateTime int64                `json:"chain_token_update_time"`
+	AccTokenUpdateTime   int64                `json:"acc_token_update_time"`
+	AllTokenUpdateTime   int64                `json:"all_token_update_time"`
+	Token                map[string]TokenData `json:"token"`
 }
 
 var updateBalanceTimeOut *time.Ticker
@@ -96,16 +99,13 @@ func saveTokenCache() error {
 	return nil
 }
 
-func loadTokenCache(creds Credentials) {
+func loadTokenCache() {
 	path := "data/cache/" + userSettings.NetworkName + "token.cache"
 	file, err := os.Open(path)
 	if err != nil {
 		fmt.Println("file not found err", err)
 		// File doesn't exist, create with default settings
-		latestTokenData.Token["SOUL"] = TokenData{Symbol: "SOUL"} //ensuring we always have main token data
-		latestTokenData.Token["KCAL"] = TokenData{Symbol: "KCAL"}
-		latestTokenData.Token["CROWN"] = TokenData{Symbol: "CROWN"}
-		fetchUserTokensInfoFromChain("", 3, true, creds)
+		updateOrCheckCache("", 3, "chain")
 		err = saveTokenCache()
 		if err != nil {
 			dialog.ShowError(fmt.Errorf("failed to save default settings\n%v", err), mainWindowGui)
@@ -118,10 +118,7 @@ func loadTokenCache(creds Credentials) {
 	err = json.NewDecoder(file).Decode(&latestTokenData)
 	if err != nil {
 		fmt.Println("decode err", err)
-		latestTokenData.Token["SOUL"] = TokenData{Symbol: "SOUL"} //ensuring we always have main token data
-		latestTokenData.Token["KCAL"] = TokenData{Symbol: "KCAL"}
-		latestTokenData.Token["CROWN"] = TokenData{Symbol: "CROWN"}
-		fetchUserTokensInfoFromChain("", 3, true, creds)
+		updateOrCheckCache("", 3, "chain")
 		err = saveTokenCache()
 		if err != nil {
 			dialog.ShowError(fmt.Errorf("failed to load Token Cache and saved default\n%v", err), mainWindowGui)
@@ -177,10 +174,10 @@ func dataFetch(creds Credentials) error {
 
 	// }
 	var err error
+	var currentUtcTime = time.Now().UTC().Unix()
+	if (currentUtcTime - latestTokenData.ChainTokenUpdateTime) > 3600 { //no need to update this data frequently
 
-	if (time.Now().UTC().Unix() - latestTokenData.LastUpdateTime) > 150 { //no need to update this data frequently updating it before min logout timeout
-		fmt.Println("*****Updating Token Data*****")
-		_, err = fetchUserTokensInfoFromChain("", 3, true, creds)
+		_, err = updateOrCheckCache("", 3, "chain")
 		if err != nil {
 			return err
 		}
@@ -189,11 +186,10 @@ func dataFetch(creds Credentials) error {
 		if err != nil {
 			return err
 		}
-		saveTokenCache()
-
+		latestTokenData.ChainTokenUpdateTime = currentUtcTime
 	}
 
-	err = getAccountData(creds.Wallets[creds.LastSelectedWallet].Address, creds, false)
+	err = getAccountData(creds.Wallets[creds.LastSelectedWallet].Address, creds)
 	if err != nil {
 		return err
 	}
@@ -201,66 +197,89 @@ func dataFetch(creds Credentials) error {
 	return nil
 }
 
-// Fetch new data from the server with retry logic
-// if update is true it will only update token data in memory
-func fetchUserTokensInfoFromChain(symbol string, retries int, update bool, creds Credentials) (TokenData, error) {
-	switch update {
-	case true:
+// "accfungible" will update and save only selected accounts fungible token data
+// "accnft" will update and save only selected accounts Nft token data
+// "acc" will update and save only  selected accounts all token data
+// "chain" will update and save only chain main tokens
+// "all": will update and save all cached token data
+// "check": will check if cache have this token or it will update it from chain and return data !!! this option is for retrieving token data others just for update
+func updateOrCheckCache(symbol string, retries int, updateType string) (TokenData, error) {
+	fmt.Println("*****Updating/checking Token cache*****")
+	switch updateType {
+
+	case "accfungible":
+		fmt.Println("-Updating acc Token Data")
+		for _, userToken := range latestAccountData.FungibleTokens {
+			_, tokenData, _ := checkChainForTokenInfo(retries, userToken.Symbol)
+			latestTokenData.Token[userToken.Symbol] = tokenData
+		}
+		saveTokenCache()
+		return TokenData{}, nil
+	case "accnft": //will update all User token data
+		fmt.Println("-Updating acc nft Data")
+		for _, userToken := range latestAccountData.NonFungible {
+			_, tokenData, _ := checkChainForTokenInfo(retries, userToken.Symbol)
+			latestTokenData.Token[userToken.Symbol] = tokenData
+		}
+		saveTokenCache()
+		return TokenData{}, nil
+
+	case "acc":
+		fmt.Println("-Updating acc Token Data")
+		for _, userToken := range latestAccountData.FungibleTokens {
+			_, tokenData, _ := checkChainForTokenInfo(retries, userToken.Symbol)
+			latestTokenData.Token[userToken.Symbol] = tokenData
+		}
+
+		for _, userToken := range latestAccountData.NonFungible {
+			_, tokenData, _ := checkChainForTokenInfo(retries, userToken.Symbol)
+			latestTokenData.Token[userToken.Symbol] = tokenData
+		}
+		latestTokenData.AccTokenUpdateTime = time.Now().UTC().Unix()
+		saveTokenCache()
+		return TokenData{}, nil
+
+	case "chain": // will update only chain main tokens
+		fmt.Println("-Updating Chain Token Data")
+		chainTokens := []string{"SOUL", "KCAL", "CROWN"}
+		for _, token := range chainTokens {
+			_, tokenData, _ := checkChainForTokenInfo(retries, token)
+			latestTokenData.Token[token] = tokenData
+		}
+		latestTokenData.ChainTokenUpdateTime = time.Now().UTC().Unix()
+		saveTokenCache()
+		return TokenData{}, nil
+
+	case "all": //will update all cached token data
+		fmt.Println("-Updating All Token Data")
 		cantFindTokenData := false
-		latestTokenData.LastUpdateTime = time.Now().UTC().Unix()
+		latestTokenData.AllTokenUpdateTime = time.Now().UTC().Unix()
 		for _, token := range latestTokenData.Token {
-			for i := 0; i < retries; i++ {
-				fmt.Println("****updating token data from chain for token "+token.Symbol+" try ", i+1, "******")
-				chainTokenData, err := client.GetToken(token.Symbol, false)
-				if err == nil {
-
-					tokenData := TokenData{
-						Symbol:        chainTokenData.Symbol,
-						Name:          chainTokenData.Name,
-						Decimals:      chainTokenData.Decimals,
-						CurrentSupply: chainTokenData.CurrentSupply,
-						MaxSupply:     chainTokenData.MaxSupply,
-						BurnedSupply:  chainTokenData.BurnedSupply,
-						Address:       chainTokenData.Address,
-						Owner:         chainTokenData.Owner,
-						Flags:         chainTokenData.Flags,
-
-						Series:   nil, // it seems sdk returning wrong types or maybe server
-						External: nil,
-						Price:    nil,
-					}
-					latestTokenData.Token[tokenData.Symbol] = tokenData
-					fmt.Println("updated token", token.Symbol)
-					break
-				}
-				// Log the error and retry after a delay
-				log.Printf("Error fetching tokens (attempt %d/%d): %v", i+1, retries, err)
-				time.Sleep(500 * time.Millisecond) // Delay before retrying
-				if i == 2 {
-					cantFindTokenData = true
-					break
-				}
-			}
+			cantFindTokenData, tokenData, _ := checkChainForTokenInfo(retries, token.Symbol)
+			latestTokenData.Token[tokenData.Symbol] = tokenData
 			if cantFindTokenData {
 				break
 			}
 
 		}
 		if cantFindTokenData {
-			fmt.Println("!!!!!! Token cache maybe corrupted resetting !!!!!!")
+			fmt.Println("!!!!!! Token cache maybe corrupted resetting to current acc's tokens!!!!!!")
 			for k := range latestTokenData.Token {
 				delete(latestTokenData.Token, k)
 			}
-			latestTokenData.Token["SOUL"] = TokenData{Symbol: "SOUL"} //ensuring we always have main token data
-			latestTokenData.Token["KCAL"] = TokenData{Symbol: "KCAL"}
-			latestTokenData.Token["CROWN"] = TokenData{Symbol: "CROWN"}
-			getAccountData(creds.Wallets[creds.LastSelectedWallet].Address, creds, true)
+			latestTokenData.AllTokenUpdateTime = time.Now().UTC().Unix()
+			updateOrCheckCache("", retries, "chain")
+			updateOrCheckCache("", retries, "acc")
+
+		} else {
+			latestTokenData.AllTokenUpdateTime = time.Now().UTC().Unix()
 			saveTokenCache()
 		}
 
 		return TokenData{}, nil
 
-	case false:
+	case "check": //will check if cache have this token or it will get data from chain
+		fmt.Println("-checking cache for Token Data")
 		token, ok := latestTokenData.Token[symbol]
 		if ok {
 			fmt.Println("****yay we have " + symbol + " token data in memory****")
@@ -274,45 +293,62 @@ func fetchUserTokensInfoFromChain(symbol string, retries int, update bool, creds
 				Address:       token.Address,
 				Owner:         token.Owner,
 				Flags:         token.Flags,
-
-				Series:   nil, // it seems sdk returning wrong types or maybe server
-				External: nil,
-				Price:    nil,
+				Series:        nil, // it seems sdk returning wrong types or maybe server
+				External:      nil,
+				Price:         nil,
 			}
 			return tokenData, nil
-		}
-
-		for i := 0; i < retries; i++ {
-			fmt.Println("****shit checking chain for token " + symbol + " ******")
-			chainTokenData, err := client.GetToken(symbol, false)
-			if err == nil {
-
-				tokenData := TokenData{
-					Symbol:        chainTokenData.Symbol,
-					Name:          chainTokenData.Name,
-					Decimals:      chainTokenData.Decimals,
-					CurrentSupply: chainTokenData.CurrentSupply,
-					MaxSupply:     chainTokenData.MaxSupply,
-					BurnedSupply:  chainTokenData.BurnedSupply,
-					Address:       chainTokenData.Address,
-					Owner:         chainTokenData.Owner,
-					Flags:         chainTokenData.Flags,
-
-					Series:   nil, // it seems sdk returning wrong types or maybe server
-					External: nil,
-					Price:    nil,
-				}
-				latestTokenData.Token[tokenData.Symbol] = tokenData
-				return tokenData, err
-			}
-
-			// Log the error and retry after a delay
-			log.Printf("Error fetching tokens (attempt %d/%d): %v", i+1, retries, err)
-			time.Sleep(500 * time.Millisecond) // Delay before retrying
+		} else {
+			_, tokenData, _ := checkChainForTokenInfo(retries, symbol)
+			latestTokenData.Token[symbol] = tokenData
+			saveTokenCache()
 		}
 
 	}
 
 	return TokenData{}, fmt.Errorf("failed to fetch tokens after %d attempts", retries)
 
+}
+
+// Fetch new data from the server with retry logic
+// it will return a boolean for notifiying token data available, token data, and error
+func checkChainForTokenInfo(retries int, symbol string) (bool, TokenData, error) {
+	cantFindTokenData := false
+	var err error
+	var chainTokenData response.TokenResult
+	for i := 0; i < retries; i++ {
+		fmt.Println("*checking token data from chain for token "+symbol+" try ", i+1, "*")
+		chainTokenData, err = client.GetToken(symbol, false)
+		if err == nil {
+
+			tokenData := TokenData{
+				Symbol:        chainTokenData.Symbol,
+				Name:          chainTokenData.Name,
+				Decimals:      chainTokenData.Decimals,
+				CurrentSupply: chainTokenData.CurrentSupply,
+				MaxSupply:     chainTokenData.MaxSupply,
+				BurnedSupply:  chainTokenData.BurnedSupply,
+				Address:       chainTokenData.Address,
+				Owner:         chainTokenData.Owner,
+				Flags:         chainTokenData.Flags,
+
+				Series:   nil, // it seems sdk returning wrong types or maybe server
+				External: nil,
+				Price:    nil,
+			}
+
+			fmt.Println("-found token data for", symbol)
+			return cantFindTokenData, tokenData, err
+
+		}
+		// Log the error and retry after a delay
+		log.Printf("Error fetching tokens (attempt %d/%d): %v", i+1, retries, err)
+		time.Sleep(500 * time.Millisecond) // Delay before retrying
+		if i == 2 {
+			cantFindTokenData = true
+			err = fmt.Errorf("can't find token data on chain after %d attempts", i+1)
+			break
+		}
+	}
+	return cantFindTokenData, TokenData{}, err
 }
