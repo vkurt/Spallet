@@ -21,6 +21,7 @@ import (
 )
 
 func manageAccountsDia(creds Credentials) {
+	changed := false //if account order, new added,name changed,removed  it will redraw mainwindow gui i am doing this because if i didnot redraw mainwindow gui wallet list will show old names but possibly binding is better solution
 	// Usage
 	askPwdDia(userSettings.AskPwd, creds.Password, mainWindowGui, func(correct bool) {
 		fmt.Println("result", correct)
@@ -50,6 +51,7 @@ func manageAccountsDia(creds Credentials) {
 					log.Println("Failed to save credentials:", err)
 					dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
 				}
+				changed = true
 				buildWalletButtons()
 				walletScroll.Content.Refresh()
 
@@ -63,6 +65,7 @@ func manageAccountsDia(creds Credentials) {
 					log.Println("Failed to save credentials:", err)
 					dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
 				}
+				changed = true
 				buildWalletButtons()
 				walletScroll.Content.Refresh()
 
@@ -77,6 +80,7 @@ func manageAccountsDia(creds Credentials) {
 				log.Println("Failed to save credentials:", err)
 				dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
 			}
+			changed = true
 			buildWalletButtons()
 			walletScroll.Content.Refresh()
 
@@ -90,12 +94,14 @@ func manageAccountsDia(creds Credentials) {
 				log.Println("Failed to save credentials:", err)
 				dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
 			}
+			changed = true
 			buildWalletButtons()
 			walletScroll.Content.Refresh()
 
 		}
 
 		buildWalletButtons = func() {
+
 			walletButtons.Objects = nil
 			for index, walletName := range creds.WalletOrder {
 				wallet := creds.Wallets[walletName]
@@ -107,11 +113,14 @@ func manageAccountsDia(creds Credentials) {
 						closeUpdatingDialog()
 						dialog.ShowError(fmt.Errorf("an error happened during data fetch\n %s", err), mainWindowGui)
 					}
-					creds.LastSelectedWallet = walletName
+					autoUpdate(updateInterval, creds)
+
 					if err := saveCredentials(creds); err != nil {
 						dialog.NewError(err, fyne.CurrentApp().Driver().AllWindows()[0]).Show()
 					}
+
 					mainWindow(creds)
+
 					if manageAccCurrDia != nil {
 						manageAccCurrDia.Hide()
 					}
@@ -175,6 +184,7 @@ func manageAccountsDia(creds Credentials) {
 						}
 						manageAccCurrDia.Hide()
 						manageAccCurrDia = dialog.NewInformation("Succesfully saved", fmt.Sprintf("New name saved for '%s' as '%s'", wallet.Address, renameEntry.Text), mainWindowGui)
+						changed = true
 						buildWalletButtons()
 						walletScroll.Content.Refresh()
 
@@ -252,6 +262,7 @@ func manageAccountsDia(creds Credentials) {
 								dialog.ShowError(err, fyne.CurrentApp().Driver().AllWindows()[0])
 							}
 							manageAccCurrDia = dialog.NewInformation("Account Removed", "Account removed succesfully", mainWindowGui)
+							changed = true
 							buildWalletButtons()
 							// manageAccCurrDia.Show()
 							walletScroll.Content.Refresh()
@@ -305,6 +316,12 @@ func manageAccountsDia(creds Credentials) {
 										})
 										return
 									}
+									creds.LastSelectedWallet = migToAccName
+									if err := saveCredentials(creds); err != nil {
+										log.Println("Failed to save credentials:", err)
+										dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
+										return
+									}
 
 									expire := time.Now().UTC().Add(time.Second * 300).Unix()
 									sb := scriptbuilder.BeginScript()
@@ -326,6 +343,7 @@ func manageAccountsDia(creds Credentials) {
 
 									// Send the transaction
 									SendTransaction(txHex, creds, handleSuccess, handleFailure)
+									autoUpdate(updateInterval, creds)
 								})
 
 								migToAccBckBttn := widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() {
@@ -497,6 +515,8 @@ func manageAccountsDia(creds Credentials) {
 
 								// Send the transaction
 								SendTransaction(txHex, creds, handleSuccess, handleFailure)
+								autoUpdate(updateInterval, creds)
+								mainWindow(creds)
 							})
 
 							migToGenBckBttn := widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() {
@@ -681,6 +701,9 @@ func manageAccountsDia(creds Credentials) {
 
 									// Send the transaction
 									SendTransaction(txHex, creds, handleSuccess, handleFailure)
+									autoUpdate(updateInterval, creds)
+									mainWindow(creds)
+
 								})
 
 								migToKeyBckBttn := widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() {
@@ -1021,6 +1044,7 @@ func manageAccountsDia(creds Credentials) {
 					} else {
 						manageAccCurrDia = dialog.NewInformation("Account saved", "Account saved successfully", mainWindowGui)
 						manageAccCurrDia.Show()
+						changed = true
 						buildWalletButtons()
 						walletScroll.Content.Refresh()
 
@@ -1092,6 +1116,7 @@ func manageAccountsDia(creds Credentials) {
 					} else {
 						manageAccCurrDia = dialog.NewInformation("Account saved", "Account saved successfully", mainWindowGui)
 						manageAccCurrDia.Show()
+						changed = true
 						buildWalletButtons()
 						walletScroll.Content.Refresh()
 
@@ -1105,7 +1130,10 @@ func manageAccountsDia(creds Credentials) {
 		})
 
 		backButton := widget.NewButton("Back", func() {
-			mainWindow(creds)
+			if changed {
+				mainWindow(creds)
+			}
+
 			currentMainDialog.Hide()
 		})
 

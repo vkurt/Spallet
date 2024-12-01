@@ -21,100 +21,473 @@ import (
 
 var dexGasLimit = big.NewInt(30000)
 
-func createDexContent(creds Credentials) *container.Scroll {
-	amountInBinding := binding.NewString()
-	slippageBinding := binding.NewString()
-	slippageBinding.Set("0.5") // Default slippage
+type DexPools struct {
+	PoolCount int      `json:"pool_count"`
+	PoolList  []string `json:"pool_list"`
+}
 
-	tokenInSelect := widget.NewSelect([]string{"SOUL", "KCAL"}, nil)
-	tokenOutSelect := widget.NewSelect([]string{"SOUL", "KCAL"}, nil)
+type PoolReserve struct {
+	Symbol  string
+	Amount  *big.Int
+	Decimal int
+}
 
-	amountEntry := widget.NewEntryWithData(amountInBinding)
-	amountEntry.SetPlaceHolder("Amount")
+type Pool struct {
+	Reserve1 PoolReserve
+	Reserve2 PoolReserve
+}
 
-	slippageEntry := widget.NewEntryWithData(slippageBinding)
-	slippageEntry.SetPlaceHolder("Slippage Tolerance %")
+var selectedPoolData Pool
+var latestDexPools DexPools
 
-	swapBtn := widget.NewButton("Swap Tokens", func() {
-		if tokenInSelect.Selected == "" || tokenOutSelect.Selected == "" {
-			dialog.ShowError(fmt.Errorf("please select tokens"), mainWindowGui)
-			return
-		}
-
-		amountStr, _ := amountInBinding.Get()
-		slippageStr, _ := slippageBinding.Get()
-
-		// Parse and validate amount
-		amount, err := convertUserInputToBigInt(amountStr, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals)
-		if err != nil {
-			dialog.ShowError(fmt.Errorf("invalid amount: %v", err), mainWindowGui)
-			return
-		}
-
-		// Verify sufficient balance
-		token := latestAccountData.FungibleTokens[tokenInSelect.Selected]
-		if amount.Cmp(&token.Amount) > 0 {
-			dialog.ShowError(fmt.Errorf("insufficient %s balance", tokenInSelect.Selected), mainWindowGui)
-			return
-		}
-
-		slippage, err := strconv.ParseFloat(slippageStr, 64)
-		if err != nil || slippage <= 0 || slippage > 100 {
-			dialog.ShowError(fmt.Errorf("invalid slippage (must be between 0 and 100)"), mainWindowGui)
-			return
-		}
-
-		// Check KCAL for gas
-		gasFee := new(big.Int).Mul(userSettings.GasPrice, dexGasLimit)
-		if err := checkFeeBalance(gasFee); err != nil {
-			dialog.ShowError(err, mainWindowGui)
-			return
-		}
-
-		// Confirm swap
-		confirmMessage := fmt.Sprintf("Swap %s %s for %s\nSlippage: %.1f%%\nGas Fee: %s KCAL",
-			formatBalance(*amount, token.Decimals),
-			tokenInSelect.Selected,
-			tokenOutSelect.Selected,
-			slippage,
-			formatBalance(*gasFee, kcalDecimals))
-
-		dialog.ShowConfirm("Confirm Swap", confirmMessage, func(confirmed bool) {
-			if confirmed {
-				err = executeSwap(tokenInSelect.Selected, tokenOutSelect.Selected, amount, slippage, creds)
-				if err != nil {
-					dialog.ShowError(err, mainWindowGui)
-				}
+func generateFromList(userTokens []string, pools []string) []string {
+	fromList := make(map[string]bool)
+	fmt.Println("Generating from list")
+	for _, token := range userTokens {
+		for _, pool := range pools {
+			fmt.Println("Pool", pool)
+			tokens := strings.Split(pool, "_")
+			if tokens[0] == token || tokens[1] == token {
+				fromList[token] = true
+				break
 			}
-		}, mainWindowGui)
-	})
+		}
+	}
 
-	switchBtn := widget.NewButton("⇅", func() {
-		tokenIn := tokenInSelect.Selected
-		tokenOut := tokenOutSelect.Selected
-		tokenInSelect.SetSelected(tokenOut)
-		tokenOutSelect.SetSelected(tokenIn)
-	})
-	inTokenSelect := container.NewHBox(widget.NewLabel("From\t"), tokenInSelect)
-	inTokenLyt := container.NewBorder(nil, nil, inTokenSelect, nil, amountEntry)
+	// Convert map keys to a slice
+	var fromListSlice []string
+	for token := range fromList {
+		fromListSlice = append(fromListSlice, token)
+	}
 
-	outAmount := widget.NewEntry()
-	outAmount.Disable()
-	outAmount.SetPlaceHolder("in development(will show out amount)")
-	outTokenSelect := container.NewHBox(widget.NewLabel("To\t"), tokenOutSelect)
-	outTokenLyt := container.NewBorder(nil, nil, outTokenSelect, nil, outAmount)
-	form := container.NewVBox(
-		inTokenLyt,
+	return fromListSlice
+}
+func updatePools() {
 
-		switchBtn,
-		outTokenLyt,
-		widget.NewLabel("Slippage Tolerance (%):"),
-		slippageEntry,
-		swapBtn,
-		widget.NewRichTextFromMarkdown("Powered by [Saturn Dex](https://saturn.stellargate.io/)"),
-	)
-	dexTab.Content = container.NewPadded(form)
-	return dexTab
+	currentPoolCount := getCountOfTokenPairsAndReserveKeys()
+
+	if latestDexPools.PoolCount < int(currentPoolCount) {
+		checkFrom := latestDexPools.PoolCount
+		latestDexPools.PoolCount = int(currentPoolCount)
+		for i := checkFrom; i < int(currentPoolCount); i += 2 {
+			tokenPairAndReserve := fetchTokenPairReserveKey(i)
+			pool := removeKey(tokenPairAndReserve)
+			latestDexPools.PoolList = append(latestDexPools.PoolList, pool)
+
+		}
+
+		saveDexPools()
+	}
+
+	// for _, pool := range poolList {
+	// 	poolTokens := strings.Split(pool, "_")
+
+	// 	dexPools[pool] = Pool{
+	// 		Reserve1: PoolReserve{Symbol: poolTokens[0]},
+	// 		Reserve2: PoolReserve{Symbol: poolTokens[1]},
+	// 	}
+
+	// }
+
+}
+
+func fetchTokenPairReserveKey(index int) string {
+
+	sb := scriptbuilder.BeginScript()
+	sb.CallContract("SATRN", "getTokenPairAndReserveKeysOnList", strconv.Itoa(index))
+	scriptPairKey := sb.EndScript()
+	encodedScript := hex.EncodeToString(scriptPairKey)
+	responsePairKey, err := client.InvokeRawScript(userSettings.ChainName, encodedScript)
+	if err != nil {
+		panic("Script1 invocation failed! Error: " + err.Error())
+	}
+	fmt.Println(responsePairKey.DecodeResult())
+	tokenPairAndReserveKey := responsePairKey.DecodeResult().AsString()
+	return tokenPairAndReserveKey
+
+}
+
+func removeKey(poolWithKey string) string {
+	var result string
+	i := strings.LastIndex(poolWithKey, "_")
+	result = poolWithKey[:i]
+	return result
+}
+
+func generateToList(fromToken string, pools []string) []string {
+	var toList []string
+
+	for _, pool := range pools {
+		tokens := strings.Split(pool, "_")
+		if tokens[0] == fromToken {
+			toList = append(toList, tokens[1])
+		} else if tokens[1] == fromToken {
+			toList = append(toList, tokens[0])
+		}
+	}
+
+	return toList
+}
+
+func selectedPool(inToken, outToken string) string {
+	for _, pool := range latestDexPools.PoolList {
+		if strings.Contains(pool, inToken) {
+			if strings.Contains(pool, outToken) {
+				return pool
+			}
+		}
+	}
+	return ""
+}
+
+func getCountOfTokenPairsAndReserveKeys() int64 {
+	sb := scriptbuilder.BeginScript()
+	sb.CallContract("SATRN", "getCountOfTokenPairsAndReserveKeysOnList")
+	script := sb.EndScript()
+	encodedScript := hex.EncodeToString(script)
+
+	response, err := client.InvokeRawScript(userSettings.ChainName, encodedScript)
+	if err != nil {
+		panic("Script1 invocation failed! Error: " + err.Error())
+	}
+
+	count := response.DecodeResult().AsNumber().Int64()
+
+	fmt.Printf("Total token pairs and reserve keys listed: %v\n", count)
+	return count
+}
+
+// gets pool reserves from pool name
+func getPoolReserves(pool string) Pool {
+	poolReserveTokens := strings.Split(pool, "_")
+	poolReserve1 := pool + "_" + poolReserveTokens[0]
+	poolReserve2 := pool + "_" + poolReserveTokens[1]
+	fmt.Printf("Checking pool reserve %v and %v\n", poolReserve1, poolReserve2)
+	sb := scriptbuilder.BeginScript()
+	sb.CallContract("SATRN", "getTokenPairAndReserveKeysOnListVALUE", poolReserve1)
+	sb.CallContract("SATRN", "getTokenPairAndReserveKeysOnListVALUE", poolReserve2)
+	scriptValue := sb.EndScript()
+	encodedScript := hex.EncodeToString(scriptValue)
+	responseValue, err := client.InvokeRawScript(userSettings.ChainName, encodedScript)
+	if err != nil {
+		panic("Script1 invocation failed! Error: " + err.Error())
+	}
+	reserve1 := responseValue.DecodeResults(0).AsNumber()
+	reserve2 := responseValue.DecodeResults(1).AsNumber()
+	token1Data, _ := updateOrCheckCache(poolReserveTokens[0], 3, "check")
+	token2Data, _ := updateOrCheckCache(poolReserveTokens[1], 3, "check")
+
+	poolData := Pool{Reserve1: PoolReserve{
+		Symbol:  poolReserveTokens[0],
+		Decimal: token1Data.Decimals,
+		Amount:  reserve1,
+	}, Reserve2: PoolReserve{
+		Symbol:  poolReserveTokens[1],
+		Decimal: token2Data.Decimals,
+		Amount:  reserve2,
+	},
+	}
+	return poolData
+
+}
+
+func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) *big.Int {
+	outAmount := big.NewInt(0)
+
+	inAmountMul := new(big.Int).Mul(inAmount, big.NewInt(997))
+	inAmountDiv := new(big.Int).Div(inAmountMul, big.NewInt(1000))
+	inAmountPlusReserves := new(big.Int).Add(inAmountDiv, inReserves)
+	inReservesMulOut := new(big.Int).Mul(inReserves, outReserves)
+	outAmount.Sub(outReserves, new(big.Int).Div(inReservesMulOut, inAmountPlusReserves))
+
+	fmt.Printf("Calculate Swap Amount: %s\n", outAmount.String())
+
+	return outAmount
+}
+
+func calculateSwapIn(outAmount, inReserves, outReserves *big.Int) *big.Int {
+	inAmount := big.NewInt(0)
+
+	outAmountMul := new(big.Int).Mul(outAmount, big.NewInt(1000))
+	outAmountDiv := new(big.Int).Div(outAmountMul, big.NewInt(997))
+	outAmountPlusReserves := new(big.Int).Add(outAmountDiv, inReserves)
+	outReservesMulOut := new(big.Int).Mul(inReserves, outReserves)
+	inAmount.Sub(outReserves, new(big.Int).Div(outReservesMulOut, outAmountPlusReserves))
+
+	fmt.Printf("Calculate Swap Amount: %s\n", outAmount.String())
+
+	return inAmount
+}
+
+func createDexContent(creds Credentials) *container.Scroll {
+	fee := new(big.Int).Mul(dexGasLimit, userSettings.GasPrice)
+	err := checkFeeBalance(fee)
+
+	if err == nil {
+		loadDexPools()
+		amountInBinding := binding.NewString()
+		slippageBinding := binding.NewString()
+		slippageBinding.Set("0.5") // Default slippage
+		amountEntry := widget.NewEntryWithData(amountInBinding)
+		amountEntry.SetPlaceHolder("Amount")
+		amountEntry.Disable()
+		warningMessageBinding := binding.NewString()
+		warningMessageBinding.Set("Please select in token")
+		warningMessage := widget.NewLabelWithData(warningMessageBinding)
+		outAmountEntry := widget.NewEntry()
+		var userTokens []string
+		for _, token := range latestAccountData.FungibleTokens {
+			userTokens = append(userTokens, token.Symbol)
+
+		}
+		updatePools()
+
+		fmt.Println("user token count, pool count", len(userTokens), len(latestDexPools.PoolList))
+		fromList := generateFromList(userTokens, latestDexPools.PoolList)
+		tokenOutSelect := widget.NewSelect([]string{}, nil)
+		tokenOutSelect.Disable()
+		outAmountEntry.Disable()
+		tokenInSelect := widget.NewSelect(fromList, nil)
+		tokenInSelect.OnChanged = func(s string) {
+			toList := generateToList(s, latestDexPools.PoolList)
+			tokenOutSelect.ClearSelected()
+			amountEntry.SetText("")
+			tokenOutSelect.SetOptions(toList)
+			amountEntry.Enable()
+			outAmountEntry.SetText("")
+			mainWindowGui.Canvas().Focus(amountEntry)
+			warningMessageBinding.Set("Please enter amount")
+		}
+
+		slippageEntry := widget.NewEntryWithData(slippageBinding)
+		slippageEntry.SetPlaceHolder("Slippage Tolerance %")
+
+		swapBtn := widget.NewButton("Swap Tokens", func() {
+			if tokenInSelect.Selected == "" || tokenOutSelect.Selected == "" {
+				dialog.ShowError(fmt.Errorf("please select tokens"), mainWindowGui)
+				return
+			}
+
+			amountStr := amountEntry.Text
+			slippageStr, _ := slippageBinding.Get()
+
+			// Parse and validate amount
+			amount, err := convertUserInputToBigInt(amountStr, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals)
+			if err != nil {
+				dialog.ShowError(fmt.Errorf("invalid amount: %v", err), mainWindowGui)
+				return
+			}
+
+			// Verify sufficient balance
+			token := latestAccountData.FungibleTokens[tokenInSelect.Selected]
+			if amount.Cmp(&token.Amount) > 0 {
+				dialog.ShowError(fmt.Errorf("insufficient %s balance", tokenInSelect.Selected), mainWindowGui)
+				return
+			}
+
+			slippage, err := strconv.ParseFloat(slippageStr, 64)
+			if err != nil || slippage <= 0 || slippage > 100 {
+				dialog.ShowError(fmt.Errorf("invalid slippage (must be between 0 and 100)"), mainWindowGui)
+				return
+			}
+
+			// Check KCAL for gas
+			gasFee := new(big.Int).Mul(userSettings.GasPrice, dexGasLimit)
+			if err := checkFeeBalance(gasFee); err != nil {
+				dialog.ShowError(err, mainWindowGui)
+				return
+			}
+
+			// Confirm swap
+			confirmMessage := fmt.Sprintf("Swap %s %s for %s\nSlippage: %.1f%%\nGas Fee: %s KCAL",
+				formatBalance(*amount, token.Decimals),
+				tokenInSelect.Selected,
+				tokenOutSelect.Selected,
+				slippage,
+				formatBalance(*gasFee, kcalDecimals))
+
+			dialog.ShowConfirm("Confirm Swap", confirmMessage, func(confirmed bool) {
+				if confirmed {
+					err = executeSwap(tokenInSelect.Selected, tokenOutSelect.Selected, amount, slippage, creds)
+					if err != nil {
+						dialog.ShowError(err, mainWindowGui)
+					}
+				}
+			}, mainWindowGui)
+		})
+		swapBtn.Disable()
+		tokenOutSelect.OnChanged = func(s string) {
+
+			if s != "" {
+				swapBtn.Enable()
+				outAmountEntry.Enable()
+				warningMessageBinding.Set(fmt.Sprintf("You can swap from %s to %s", tokenInSelect.Selected, s))
+				pool := selectedPool(tokenInSelect.Selected, s)
+				selectedPoolData = getPoolReserves(pool)
+				inAmount, _ := convertUserInputToBigInt(amountEntry.Text, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals)
+				if selectedPoolData.Reserve1.Symbol == tokenInSelect.Selected {
+					inReserve := selectedPoolData.Reserve1.Amount
+					outReserve := selectedPoolData.Reserve2.Amount
+					estOutAmount := calculateSwapOut(inAmount, inReserve, outReserve)
+					estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve2.Decimal)
+					outAmountEntry.Text = estOutAmountStr
+					outAmountEntry.Refresh()
+
+				} else {
+					inReserve := selectedPoolData.Reserve2.Amount
+					outReserve := selectedPoolData.Reserve1.Amount
+					estOutAmount := calculateSwapOut(inAmount, inReserve, outReserve)
+					estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve1.Decimal)
+					outAmountEntry.Text = estOutAmountStr
+					outAmountEntry.Refresh()
+				}
+
+			}
+		}
+		amountEntry.Validator = func(s string) error {
+			input, err := convertUserInputToBigInt(s, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals)
+			if err != nil {
+				warningMessageBinding.Set(err.Error())
+
+				swapBtn.Disable()
+				return err
+			}
+			if input.Cmp(big.NewInt(0)) <= 0 {
+				warningMessageBinding.Set("Please enter amount")
+
+				swapBtn.Disable()
+				return err
+			}
+			if tokenInSelect.Selected == "KCAL" {
+				fee := new(big.Int).Mul(dexGasLimit, defaultSettings.GasPrice)
+				max := new(big.Int).Add(input, fee)
+				err := checkFeeBalance(max)
+				if err != nil {
+					swapBtn.Disable()
+					warningMessageBinding.Set("Not enough Kcal")
+					return err
+
+				}
+
+			}
+			balance := latestAccountData.FungibleTokens[tokenInSelect.Selected].Amount
+			if input.Cmp(&balance) <= 0 {
+				if tokenOutSelect.Selected == "" {
+					warningMessageBinding.Set("Please select out token")
+					swapBtn.Disable()
+				} else {
+					warningMessageBinding.Set(fmt.Sprintf("You can swap from %s to %s", tokenInSelect.Selected, tokenOutSelect.Selected))
+					swapBtn.Enable()
+				}
+
+				tokenOutSelect.Enable()
+				return nil
+			} else {
+
+				swapBtn.Disable()
+				warningMessageBinding.Set("Balance is not sufficent")
+				return fmt.Errorf("balance is not sufficent")
+			}
+		}
+		swapIcon := widget.NewLabelWithStyle("🢃", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+		maxBttn := widget.NewButton("Max", func() {
+			if tokenInSelect.Selected == "KCAL" {
+				fee := new(big.Int).Mul(dexGasLimit, defaultSettings.GasPrice)
+				kcalbal := latestAccountData.FungibleTokens[tokenInSelect.Selected].Amount
+				max := new(big.Int).Sub(&kcalbal, fee)
+				if max.Cmp(big.NewInt(0)) >= 0 {
+					amountEntry.Text = (formatBalance(*max, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals))
+					amountEntry.Validate()
+					amountEntry.Refresh()
+				} else {
+					amountEntry.SetText("Not enough Kcal")
+					amountEntry.Validate()
+					amountEntry.Refresh()
+				}
+
+			} else {
+				amountEntry.Text = (formatBalance(latestAccountData.FungibleTokens[tokenInSelect.Selected].Amount, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals))
+				amountEntry.Validate()
+				amountEntry.Refresh()
+			}
+		})
+		inTokenSelect := container.NewHBox(widget.NewLabel("From\t"), tokenInSelect)
+		inTokenLyt := container.NewBorder(nil, nil, inTokenSelect, maxBttn, amountEntry)
+
+		amountEntry.OnChanged = func(s string) {
+			if tokenOutSelect.Selected != "" {
+
+				inAmount, err := convertUserInputToBigInt(amountEntry.Text, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals)
+				if err != nil {
+					return
+				}
+				if selectedPoolData.Reserve1.Symbol == tokenInSelect.Selected {
+					inReserve := selectedPoolData.Reserve1.Amount
+					outReserve := selectedPoolData.Reserve2.Amount
+					estOutAmount := calculateSwapOut(inAmount, inReserve, outReserve)
+					estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve2.Decimal)
+					outAmountEntry.Text = (estOutAmountStr)
+					outAmountEntry.Refresh()
+
+				} else {
+					inReserve := selectedPoolData.Reserve2.Amount
+					outReserve := selectedPoolData.Reserve1.Amount
+					estOutAmount := calculateSwapOut(inAmount, inReserve, outReserve)
+					estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve1.Decimal)
+					outAmountEntry.Text = (estOutAmountStr)
+					outAmountEntry.Refresh()
+				}
+
+			}
+		}
+
+		outAmountEntry.OnChanged = func(s string) {
+			tokenData, _ := updateOrCheckCache(tokenOutSelect.Selected, 3, "check")
+			outAmount, err := convertUserInputToBigInt(s, tokenData.Decimals)
+			if err != nil {
+				warningMessageBinding.Set(err.Error())
+				swapBtn.Disable()
+				return
+			}
+			if tokenOutSelect.Selected == selectedPoolData.Reserve1.Symbol {
+				inAmount := calculateSwapIn(outAmount, selectedPoolData.Reserve1.Amount, selectedPoolData.Reserve2.Amount)
+				inAmountStr := formatBalance(*inAmount, selectedPoolData.Reserve2.Decimal)
+				amountEntry.Text = inAmountStr
+				amountEntry.Refresh()
+				amountEntry.Validate()
+			} else {
+				inAmount := calculateSwapIn(outAmount, selectedPoolData.Reserve2.Amount, selectedPoolData.Reserve1.Amount)
+				inAmountStr := formatBalance(*inAmount, selectedPoolData.Reserve1.Decimal)
+				amountEntry.Text = inAmountStr
+				amountEntry.Refresh()
+				amountEntry.Validate()
+			}
+
+		}
+		// outAmountEntry.Disable()
+		outAmountEntry.SetPlaceHolder("Estimated out amount")
+		outTokenSelect := container.NewHBox(widget.NewLabel("To\t"), tokenOutSelect)
+		outTokenLyt := container.NewBorder(nil, nil, outTokenSelect, nil, outAmountEntry)
+		form := container.NewVBox(
+			inTokenLyt,
+
+			swapIcon,
+			outTokenLyt,
+			widget.NewLabel("Slippage Tolerance (%):"),
+			slippageEntry,
+			warningMessage,
+			swapBtn,
+			widget.NewRichTextFromMarkdown("Powered by [Saturn Dex](https://saturn.stellargate.io/)"),
+		)
+		dexTab.Content = container.NewPadded(form)
+		return dexTab
+	} else {
+		noKcalMessage := widget.NewLabelWithStyle(fmt.Sprintf("Looks like Sparky low on sparks! ⚡️🕹️\n Your swap needs some Phantasma Energy (KCAL) to keep the ghostly gears turning. Time to add some KCAL and get that blockchain buzzing faster than a haunted hive!\n You need at least %v Kcal", formatBalance(*fee, kcalDecimals)), fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+		noKcalMessage.Wrapping = fyne.TextWrapWord
+		dexTab.Content = container.NewVBox(noKcalMessage)
+		return dexTab
+	}
+
 }
 
 func executeSwap(tokenIn, tokenOut string, amountIn *big.Int, slippageTolerance float64, creds Credentials) error {

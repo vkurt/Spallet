@@ -312,6 +312,15 @@ func openSecurityDia(creds Credentials) {
 	})
 }
 
+// // Usage
+//
+//	askPwdDia(askPwd, creds.Password, mainWindowGui, func(correct bool) {
+//		 fmt.Println("result", correct)
+//		 if !correct {
+//			return
+//			}
+//		 // Continue with your code here })
+//		})
 func askPwdDia(askPwd bool, pwd string, mainWindow fyne.Window, callback func(bool)) {
 	if askPwd {
 		pwdEntry := widget.NewPasswordEntry()
@@ -359,12 +368,3 @@ func askPwdDia(askPwd bool, pwd string, mainWindow fyne.Window, callback func(bo
 		callback(true)
 	}
 }
-
-// // Usage
-// askPwdDia(askPwd, creds.Password, mainWindowGui, func(correct bool) {
-// 	 fmt.Println("result", correct)
-// 	 if !correct {
-// 		return
-// 		}
-// 	 // Continue with your code here })
-// 	})

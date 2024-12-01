@@ -165,6 +165,72 @@ func loadSettings(path string) {
 	applySettings()
 
 }
+func loadDexPools() {
+	file, err := os.Open("data/cache/dexpools.cache")
+	if err != nil {
+		// File doesn't exist, create with default settings
+
+		latestDexPools.PoolCount = 14
+		latestDexPools.PoolList = []string{
+			"SOUL_KCAL",
+			"BNB_SOUL",
+			"RAA_SOUL",
+			"RAA_KCAL",
+			"BNB_KCAL",
+			"GAS_SOUL",
+			"ETH_SOUL"}
+		err = saveDexPools()
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("failed to save default dex pools\n%v", err), mainWindowGui)
+		}
+
+		return
+	}
+	defer file.Close()
+
+	err = json.NewDecoder(file).Decode(&latestDexPools)
+	if err != nil {
+		// File doesn't exist, create with default settings
+
+		latestDexPools.PoolCount = 14
+		latestDexPools.PoolList = []string{
+			"SOUL_KCAL",
+			"BNB_SOUL",
+			"RAA_SOUL",
+			"RAA_KCAL",
+			"BNB_KCAL",
+			"GAS_SOUL",
+			"ETH_SOUL"}
+		err = saveDexPools()
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("failed to load dex pools,saved default dex pools\n%v", err), mainWindowGui)
+		}
+
+		return
+	}
+
+}
+
+func saveDexPools() error {
+	filename := "data/cache/dexpools.cache"
+
+	// Ensure the directory exists
+	if err := os.MkdirAll(filepath.Dir(filename), 0700); err != nil {
+		return err
+	}
+
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	err = json.NewEncoder(file).Encode(&latestDexPools)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 // Save settings to file
 func saveSettings() error {

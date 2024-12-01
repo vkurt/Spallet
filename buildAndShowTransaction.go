@@ -274,7 +274,7 @@ func displayTransactions(transactions []TransactionResult, totalPages uint, addr
 
 	paginationContainer := container.NewHBox(paginationButtons...)
 	pageContainer := container.NewVScroll(container.NewVBox(transactionItems...))
-	pageContainer.SetMinSize(fyne.NewSize(400, 450))
+	pageContainer.SetMinSize(fyne.NewSize(400, 490))
 
 	content.Objects = []fyne.CanvasObject{
 		container.NewBorder(nil, paginationContainer, nil, nil, pageContainer),

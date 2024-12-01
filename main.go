@@ -264,7 +264,7 @@ func mainWindow(creds Credentials) {
 		container.NewTabItem("NFTs", nftTab),
 		container.NewTabItem("Hodling", stakingTab),
 		container.NewTabItem("History", historyContent),
-		container.NewTabItem("Dex", createDexContent(creds)),
+		container.NewTabItem("Dex", dexTab),
 		container.NewTabItem("Bridge", widget.NewLabel("When Phantasma enables this\n will try to integrate it but no promises so it means SOON 😂")),
 		container.NewTabItem("Soon", soonContent),
 	)
@@ -273,14 +273,23 @@ func mainWindow(creds Credentials) {
 	tabContainer.OnSelected = func(tab *container.TabItem) {
 		switch tab.Text {
 		case "Hodling":
-			feeAmount := new(big.Int).Mul(userSettings.DefaultGasLimit, userSettings.GasPrice)
-			err := checkFeeBalance(feeAmount)
-			if err != nil {
-				dialog.ShowInformation("Low energy", fmt.Sprintf("This account dont have enough Kcal to fill Specky's engines\nPlease check your default fee limit/price in network settings\nor get some Kcal\n\n%s", err), mainWindowGui)
+			AccSoul, ok := latestAccountData.FungibleTokens["SOUL"]
+			if (ok && AccSoul.Amount.Cmp(minSoulStake) >= 0) || latestAccountData.IsStaker {
+				AccSoul.Amount.Cmp(minSoulStake)
+				feeAmount := new(big.Int).Mul(userSettings.DefaultGasLimit, userSettings.GasPrice)
+				err := checkFeeBalance(feeAmount)
+				if err != nil {
+					dialog.ShowInformation("Low energy", fmt.Sprintf("This account dont have enough Kcal to fill Specky's engines\nPlease check your default fee limit/price in network settings\nor get some Kcal\n\n%s", err), mainWindowGui)
+				}
 			}
+
 		case "History":
 			showUpdatingDialog()
 			buildAndShowTxes(creds.Wallets[creds.LastSelectedWallet].Address, page, pageSize, historyContent)
+			closeUpdatingDialog()
+		case "Dex":
+			showUpdatingDialog()
+			dexTab = createDexContent(creds)
 			closeUpdatingDialog()
 		}
 
@@ -331,6 +340,7 @@ func mainWindow(creds Credentials) {
 	walletSelect.OnChanged = func(selected string) {
 		creds.LastSelectedWallet = selected
 		autoUpdate(updateInterval, creds)
+
 		showUpdatingDialog()
 		err := dataFetch(creds)
 		if err != nil {
@@ -340,6 +350,8 @@ func mainWindow(creds Credentials) {
 			updateWalletInfo(creds, walletInfo)
 
 			saveCredentials(creds)
+			dexTab = createDexContent(creds) // dex page also need an update but dunno this is a godd solution
+			dexTab.Refresh()
 
 			closeUpdatingDialog()
 		}

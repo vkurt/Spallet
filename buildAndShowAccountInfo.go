@@ -42,8 +42,8 @@ func buildAndShowAccInfo(creds Credentials) {
 	accSoulAmount := latestAccountData.FungibleTokens["SOUL"].Amount
 	accStakingInfoHeader := " "
 	accountSummaryHeader := " "
-	if accKcalAmount.Cmp(big.NewInt(10000000000)) < 0 && (latestAccountData.TokenCount > 0 || latestAccountData.NftTypes > 0) {
-		accountSummaryHeader = "Running low on Phantasma Energy(Kcal)?\n You’re running on empty! Charge up those sparks you can’t transact without them.\n It's the fuel of the Phantasma chain! ⚡💡"
+	if accKcalAmount.Cmp(big.NewInt(3000000000)) < 0 && (latestAccountData.TokenCount > 0 || latestAccountData.NftTypes > 0) {
+		accountSummaryHeader = "Looks like Sparky low on sparks! ⚡️🕹️\n Your account needs some Phantasma Energy (KCAL) to keep the ghostly gears turning. Time to add some KCAL and get that blockchain buzzing faster than a haunted hive!"
 	} else {
 		accountSummaryHeader = "Account Summary"
 	}
@@ -138,8 +138,10 @@ func buildAndShowAccInfo(creds Credentials) {
 			accSoulMasterInfo = accSoulMasterInfo + "You're on the brink of royalty.\nKeep hodling, your crown awaits in the current distribution! 👑\n"
 		}
 	}
+	accSumHeader := widget.NewLabelWithStyle(accountSummaryHeader, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	accSumHeader.Wrapping = fyne.TextWrapWord
 	accInfo := container.NewVBox(
-		widget.NewLabelWithStyle(accountSummaryHeader, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		accSumHeader,
 		widget.NewRichTextWithText(accSummaryInfo),
 		widget.NewLabelWithStyle(accStakingInfoHeader, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		widget.NewLabel(accStakingInfo),
