@@ -162,7 +162,7 @@ func getPoolReserves(pool string) Pool {
 	poolReserveTokens := strings.Split(pool, "_")
 	poolReserve1 := pool + "_" + poolReserveTokens[0]
 	poolReserve2 := pool + "_" + poolReserveTokens[1]
-	fmt.Printf("Checking pool reserve %v and %v\n", poolReserve1, poolReserve2)
+	fmt.Printf("*****Checking pool %v reserves*****\n", pool)
 	sb := scriptbuilder.BeginScript()
 	sb.CallContract("SATRN", "getTokenPairAndReserveKeysOnListVALUE", poolReserve1)
 	sb.CallContract("SATRN", "getTokenPairAndReserveKeysOnListVALUE", poolReserve2)
@@ -187,11 +187,12 @@ func getPoolReserves(pool string) Pool {
 		Amount:  reserve2,
 	},
 	}
+	fmt.Printf("%v reserve: %v\n%v reserve: %v\n", poolReserveTokens[0], formatBalance(*poolData.Reserve1.Amount, poolData.Reserve1.Decimal), poolReserveTokens[1], formatBalance(*poolData.Reserve2.Amount, poolData.Reserve2.Decimal))
 	return poolData
 
 }
 
-func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) *big.Int {
+func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) (*big.Int, error) {
 	outAmount := big.NewInt(0)
 
 	inAmountMul := new(big.Int).Mul(inAmount, big.NewInt(997))
@@ -202,21 +203,41 @@ func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) *big.Int {
 
 	fmt.Printf("Calculate Swap Amount: %s\n", outAmount.String())
 
-	return outAmount
+	if outAmount.Cmp(outReserves) >= 0 {
+		return nil, fmt.Errorf("unsufficient liquidity")
+	}
+	if outAmount.Cmp(big.NewInt(0)) <= 0 {
+		return nil, fmt.Errorf("in amount is too small")
+	}
+
+	return outAmount, nil
 }
+func calculateSwapIn(outAmount, inReserves, outReserves *big.Int) (*big.Int, error) {
+	// Define constants for fee calculations
+	const feeNumerator = 997
+	const feeDenominator = 1000
 
-func calculateSwapIn(outAmount, inReserves, outReserves *big.Int) *big.Int {
-	inAmount := big.NewInt(0)
+	// Calculate the numerator: outAmount * inReserves * feeDenominator
+	numerator := new(big.Int).Mul(outAmount, inReserves)
+	numerator = new(big.Int).Mul(numerator, big.NewInt(feeDenominator))
 
-	outAmountMul := new(big.Int).Mul(outAmount, big.NewInt(1000))
-	outAmountDiv := new(big.Int).Div(outAmountMul, big.NewInt(997))
-	outAmountPlusReserves := new(big.Int).Add(outAmountDiv, inReserves)
-	outReservesMulOut := new(big.Int).Mul(inReserves, outReserves)
-	inAmount.Sub(outReserves, new(big.Int).Div(outReservesMulOut, outAmountPlusReserves))
+	// Calculate the denominator: (outReserves - outAmount) * feeNumerator
+	denominator := new(big.Int).Sub(outReserves, outAmount)
+	denominator = new(big.Int).Mul(denominator, big.NewInt(feeNumerator))
 
-	fmt.Printf("Calculate Swap Amount: %s\n", outAmount.String())
+	// Calculate the input amount
+	inAmount := new(big.Int).Div(numerator, denominator)
 
-	return inAmount
+	// Adding one to handle rounding issues
+	inAmount = inAmount.Add(inAmount, big.NewInt(1))
+
+	fmt.Printf("Calculate Swap In Amount: %s\n", inAmount.String())
+	if inAmount.Cmp(big.NewInt(0)) <= 0 {
+
+		return nil, fmt.Errorf("unsufficient liquidity")
+	}
+
+	return inAmount, nil
 }
 
 func createDexContent(creds Credentials) *container.Scroll {
@@ -328,7 +349,12 @@ func createDexContent(creds Credentials) *container.Scroll {
 				if selectedPoolData.Reserve1.Symbol == tokenInSelect.Selected {
 					inReserve := selectedPoolData.Reserve1.Amount
 					outReserve := selectedPoolData.Reserve2.Amount
-					estOutAmount := calculateSwapOut(inAmount, inReserve, outReserve)
+					estOutAmount, err := calculateSwapOut(inAmount, inReserve, outReserve)
+					if err != nil {
+						warningMessageBinding.Set(err.Error())
+						swapBtn.Disable()
+						return
+					}
 					estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve2.Decimal)
 					outAmountEntry.Text = estOutAmountStr
 					outAmountEntry.Refresh()
@@ -336,7 +362,12 @@ func createDexContent(creds Credentials) *container.Scroll {
 				} else {
 					inReserve := selectedPoolData.Reserve2.Amount
 					outReserve := selectedPoolData.Reserve1.Amount
-					estOutAmount := calculateSwapOut(inAmount, inReserve, outReserve)
+					estOutAmount, err := calculateSwapOut(inAmount, inReserve, outReserve)
+					if err != nil {
+						warningMessageBinding.Set(err.Error())
+						swapBtn.Disable()
+						return
+					}
 					estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve1.Decimal)
 					outAmountEntry.Text = estOutAmountStr
 					outAmountEntry.Refresh()
@@ -389,6 +420,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 				return fmt.Errorf("balance is not sufficent")
 			}
 		}
+
 		swapIcon := widget.NewLabelWithStyle("🢃", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 		maxBttn := widget.NewButton("Max", func() {
 			if tokenInSelect.Selected == "KCAL" {
@@ -396,7 +428,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 				kcalbal := latestAccountData.FungibleTokens[tokenInSelect.Selected].Amount
 				max := new(big.Int).Sub(&kcalbal, fee)
 				if max.Cmp(big.NewInt(0)) >= 0 {
-					amountEntry.Text = (formatBalance(*max, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals))
+					amountEntry.SetText(formatBalance(*max, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals))
 					amountEntry.Validate()
 					amountEntry.Refresh()
 				} else {
@@ -406,7 +438,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 				}
 
 			} else {
-				amountEntry.Text = (formatBalance(latestAccountData.FungibleTokens[tokenInSelect.Selected].Amount, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals))
+				amountEntry.SetText(formatBalance(latestAccountData.FungibleTokens[tokenInSelect.Selected].Amount, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals))
 				amountEntry.Validate()
 				amountEntry.Refresh()
 			}
@@ -424,7 +456,12 @@ func createDexContent(creds Credentials) *container.Scroll {
 				if selectedPoolData.Reserve1.Symbol == tokenInSelect.Selected {
 					inReserve := selectedPoolData.Reserve1.Amount
 					outReserve := selectedPoolData.Reserve2.Amount
-					estOutAmount := calculateSwapOut(inAmount, inReserve, outReserve)
+					estOutAmount, err := calculateSwapOut(inAmount, inReserve, outReserve)
+					if err != nil {
+						warningMessageBinding.Set(err.Error())
+						swapBtn.Disable()
+						return
+					}
 					estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve2.Decimal)
 					outAmountEntry.Text = (estOutAmountStr)
 					outAmountEntry.Refresh()
@@ -432,7 +469,12 @@ func createDexContent(creds Credentials) *container.Scroll {
 				} else {
 					inReserve := selectedPoolData.Reserve2.Amount
 					outReserve := selectedPoolData.Reserve1.Amount
-					estOutAmount := calculateSwapOut(inAmount, inReserve, outReserve)
+					estOutAmount, err := calculateSwapOut(inAmount, inReserve, outReserve)
+					if err != nil {
+						warningMessageBinding.Set(err.Error())
+						swapBtn.Disable()
+						return
+					}
 					estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve1.Decimal)
 					outAmountEntry.Text = (estOutAmountStr)
 					outAmountEntry.Refresh()
@@ -449,14 +491,27 @@ func createDexContent(creds Credentials) *container.Scroll {
 				swapBtn.Disable()
 				return
 			}
+			if outAmount.Cmp(big.NewInt(0)) <= 0 {
+				warningMessageBinding.Set("In amount is too small")
+				swapBtn.Disable()
+				return
+			}
 			if tokenOutSelect.Selected == selectedPoolData.Reserve1.Symbol {
-				inAmount := calculateSwapIn(outAmount, selectedPoolData.Reserve1.Amount, selectedPoolData.Reserve2.Amount)
+				inAmount, err := calculateSwapIn(outAmount, selectedPoolData.Reserve2.Amount, selectedPoolData.Reserve1.Amount)
+				if err != nil {
+					warningMessageBinding.Set(err.Error())
+					return
+				}
 				inAmountStr := formatBalance(*inAmount, selectedPoolData.Reserve2.Decimal)
 				amountEntry.Text = inAmountStr
 				amountEntry.Refresh()
 				amountEntry.Validate()
 			} else {
-				inAmount := calculateSwapIn(outAmount, selectedPoolData.Reserve2.Amount, selectedPoolData.Reserve1.Amount)
+				inAmount, err := calculateSwapIn(outAmount, selectedPoolData.Reserve1.Amount, selectedPoolData.Reserve2.Amount)
+				if err != nil {
+					warningMessageBinding.Set(err.Error())
+					return
+				}
 				inAmountStr := formatBalance(*inAmount, selectedPoolData.Reserve1.Decimal)
 				amountEntry.Text = inAmountStr
 				amountEntry.Refresh()
