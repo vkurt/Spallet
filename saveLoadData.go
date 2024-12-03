@@ -27,6 +27,7 @@ type WalletSettings struct {
 	RpcType           string   `json:"rpc_type"` //tried rpc.PhantasmaRpc but not worked
 	CustomRpcLink     string   `json:"custom_rpc_link"`
 	NetworkType       string   `json:"network_type"`
+	DexSlippage       float64  `json:"dex_slippage"`
 }
 
 var client rpc.PhantasmaRPC
@@ -46,6 +47,7 @@ var defaultSettings = WalletSettings{
 	AccExplorerLink:   "https://explorer.phantasma.info/en/address?id=",
 	RpcType:           "mainnet",
 	NetworkType:       "Mainnet",
+	DexSlippage:       5,
 }
 
 func saveAddressBook(adrBk addressBook, pwd string) error {
@@ -170,7 +172,7 @@ func loadDexPools() {
 	if err != nil {
 		// File doesn't exist, create with default settings
 
-		latestDexPools.PoolCount = 14
+		latestDexPools.PoolKeyCount = 14
 		latestDexPools.PoolList = []string{
 			"SOUL_KCAL",
 			"BNB_SOUL",
@@ -192,7 +194,7 @@ func loadDexPools() {
 	if err != nil {
 		// File doesn't exist, create with default settings
 
-		latestDexPools.PoolCount = 14
+		latestDexPools.PoolKeyCount = 14
 		latestDexPools.PoolList = []string{
 			"SOUL_KCAL",
 			"BNB_SOUL",
