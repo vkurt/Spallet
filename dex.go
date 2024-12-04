@@ -212,7 +212,31 @@ func getPoolReserves(pool string) Pool {
 }
 
 func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) (*big.Int, error) {
+
+	fmt.Printf("calculating Swap Out\nin amount %v\nin reserves %v\nout reserves %v\n", inAmount, inReserves, outReserves)
+
 	outAmount := big.NewInt(0)
+	// commonDecimal := outReserveDecimal - inReserveDecimal
+	// var normalizedInReserves *big.Int // added this to find a bug but it is unnecessary because it turned out i made a stupid decimal error
+	// var normalizedOutReserves *big.Int
+	// var normalizedInAmount *big.Int
+
+	// if commonDecimal > 0 {
+	// 	normalizedInReserves = new(big.Int).Mul(inReserves, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(commonDecimal)), nil))
+	// 	normalizedInAmount = new(big.Int).Mul(inAmount, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(commonDecimal)), nil))
+	// 	normalizedOutReserves = outReserves
+	// } else if commonDecimal < 0 {
+	// 	normalizedOutReserves = new(big.Int).Mul(outReserves, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-commonDecimal)), nil))
+	// 	normalizedInReserves = inReserves
+	// 	normalizedInAmount = inAmount
+
+	// } else {
+	// 	normalizedInReserves = inReserves
+	// 	normalizedOutReserves = outReserves
+	// 	normalizedInAmount = inAmount
+	// }
+
+	// fmt.Printf("-Normalized amounts\nin %v\nin reserve %v\nout reserve %v\n", normalizedInAmount, normalizedInReserves, normalizedOutReserves)
 
 	inAmountMul := new(big.Int).Mul(inAmount, big.NewInt(997))
 	inAmountDiv := new(big.Int).Div(inAmountMul, big.NewInt(1000))
@@ -220,7 +244,14 @@ func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) (*big.Int, err
 	inReservesMulOut := new(big.Int).Mul(inReserves, outReserves)
 	outAmount.Sub(outReserves, new(big.Int).Div(inReservesMulOut, inAmountPlusReserves))
 
-	fmt.Printf("Calculate Swap Amount: %s\n", outAmount.String())
+	fmt.Printf("-Calculation variables\ninAmountMul %v\ninAmountDiv %v\ninAmountPlusReserves %v\ninReservesMulOut %v\n", inAmountMul, inAmountDiv, inAmountPlusReserves, inReservesMulOut)
+
+	// // Renormalize the outAmount to the scale of inDecimals
+	// if commonDecimal < 0 {
+	// 	outAmount.Div(outAmount, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-commonDecimal)), nil))
+	// }
+
+	fmt.Printf("-Calculated Swap out Amount: %s\n", outAmount.String())
 
 	if outAmount.Cmp(outReserves) >= 0 {
 		return nil, fmt.Errorf("unsufficient liquidity")
@@ -272,6 +303,8 @@ func calculateSwapIn(outAmount, inReserves, outReserves *big.Int) (*big.Int, err
 // - *big.Int: The estimated input amount for the swapIn type.
 // - error: Any error encountered during the calculation.
 func calculateSwapAndPriceImpact(inAmount, outAmount, inReserves, outReserves *big.Int, swapType string) (float64, *big.Int, *big.Int, error) {
+	fmt.Printf("*****Calculate Swap and price impact*****\nIn amount %v\noutAmount %v\nIn Reserves %v\nOut Reserves %v\nSwap Type %v\n", inAmount, outAmount, inReserves, outReserves, swapType)
+
 	initialPrice := new(big.Float).Quo(new(big.Float).SetInt(outReserves), new(big.Float).SetInt(inReserves))
 
 	var finalInReserves, finalOutReserves *big.Int
@@ -319,10 +352,10 @@ func createDexContent(creds Credentials) *container.Scroll {
 	var priceImpactIsNotHigh bool
 	if err == nil {
 		loadDexPools()
-		amountInBinding := binding.NewString()
+
 		slippageBinding := binding.NewString()
 		slippageBinding.Set(fmt.Sprintf("%f", currentDexSlippage)) // Default slippage
-		amountEntry := widget.NewEntryWithData(amountInBinding)
+		amountEntry := widget.NewEntry()
 		amountEntry.SetPlaceHolder("Amount")
 		amountEntry.Disable()
 		warningMessageBinding := binding.NewString()
@@ -352,6 +385,8 @@ func createDexContent(creds Credentials) *container.Scroll {
 			outAmountEntry.SetText("")
 			mainWindowGui.Canvas().Focus(amountEntry)
 			warningMessageBinding.Set("Please enter amount")
+			outAmountEntry.Disable()
+			tokenOutSelect.Disable()
 		}
 
 		slippageEntry := widget.NewEntryWithData(slippageBinding)
@@ -486,7 +521,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 					if priceImpact > userSlippage {
 						priceImpactIsNotHigh = false
 						warningMessageBinding.Set(fmt.Sprintf("Price impact is too high, current price impact %.2f%%", priceImpact))
-						estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve2.Decimal)
+						estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve1.Decimal)
 						outAmountEntry.Text = (estOutAmountStr)
 						outAmountEntry.Refresh()
 						checkSwapBtnState()
@@ -691,6 +726,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 					outAmountEntryCorrect = true
 					checkSwapBtnState()
 					warningMessageBinding.Set(fmt.Sprintf("You can swap from %s to %s with price impact %.2f%%", tokenInSelect.Selected, tokenOutSelect.Selected, impact))
+					outAmountEntry.Validate()
 					outAmountEntry.Refresh()
 
 				} else {
@@ -707,7 +743,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 					if priceImpact > userSlippage {
 						priceImpactIsNotHigh = false
 						warningMessageBinding.Set(fmt.Sprintf("Price impact is too high, current price impact %.2f%%", priceImpact))
-						estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve2.Decimal)
+						estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve1.Decimal)
 						outAmountEntry.Text = (estOutAmountStr)
 						outAmountEntry.Refresh()
 						checkSwapBtnState()
@@ -721,6 +757,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 					outAmountEntryCorrect = true
 					checkSwapBtnState()
 					warningMessageBinding.Set(fmt.Sprintf("You can swap from %s to %s with price impact %.2f%%", tokenInSelect.Selected, tokenOutSelect.Selected, impact))
+					outAmountEntry.Validate()
 					outAmountEntry.Refresh()
 				}
 
@@ -742,13 +779,21 @@ func createDexContent(creds Credentials) *container.Scroll {
 				checkSwapBtnState()
 				return fmt.Errorf("in amount is too small")
 			}
+
+			return nil
+
+		}
+		outAmountEntry.OnChanged = func(s string) {
+			tokenData, _ := updateOrCheckCache(tokenOutSelect.Selected, 3, "check")
+			outAmount, _ := convertUserInputToBigInt(s, tokenData.Decimals)
+
 			if tokenOutSelect.Selected == selectedPoolData.Reserve1.Symbol {
 
 				impact, _, estInAmount, err := calculateSwapAndPriceImpact(nil, outAmount, selectedPoolData.Reserve2.Amount, selectedPoolData.Reserve1.Amount, "swapIn") //(inAmount, inReserve, outReserve)
 
 				if err != nil {
 					warningMessageBinding.Set(err.Error())
-					return err
+					return
 				}
 				inAmountStr := formatBalance(*estInAmount, selectedPoolData.Reserve2.Decimal)
 				amountEntry.Text = inAmountStr
@@ -758,10 +803,10 @@ func createDexContent(creds Credentials) *container.Scroll {
 				checkSwapBtnState()
 				amountEntry.Validate()
 			} else {
-				impact, _, estInAmount, err := calculateSwapAndPriceImpact(nil, outAmount, selectedPoolData.Reserve1.Amount, selectedPoolData.Reserve2.Amount, "swapIn") //(inAmount, inReserve, outReserve)
+				impact, _, estInAmount, err := calculateSwapAndPriceImpact(nil, outAmount, selectedPoolData.Reserve1.Amount, selectedPoolData.Reserve2.Amount, "swapIn")
 				if err != nil {
 					warningMessageBinding.Set(err.Error())
-					return err
+					return
 				}
 				inAmountStr := formatBalance(*estInAmount, selectedPoolData.Reserve1.Decimal)
 				amountEntry.Text = inAmountStr
@@ -772,8 +817,6 @@ func createDexContent(creds Credentials) *container.Scroll {
 				outAmountEntryCorrect = true
 				checkSwapBtnState()
 			}
-			return nil
-
 		}
 		// outAmountEntry.Disable()
 
