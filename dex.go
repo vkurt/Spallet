@@ -565,7 +565,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 				if err == nil {
 
 					dialog.ShowInformation("Saved successfully", fmt.Sprintf("Your default slippage is set to %.2f%%", slippage), mainWindowGui)
-
+					slippageEntry.Validate()
 				} else {
 					dialog.ShowError(err, mainWindowGui)
 				}
@@ -579,16 +579,19 @@ func createDexContent(creds Credentials) *container.Scroll {
 			if err != nil {
 				slippageEntryCorrect = false
 				slippageSaveBtn.Disable()
+				slippageSaveBtn.Refresh()
 				checkSwapBtnState()
 				return err
 			} else if slippage <= 0 {
 				slippageEntryCorrect = false
 				slippageSaveBtn.Disable()
+				slippageSaveBtn.Refresh()
 				checkSwapBtnState()
 				return fmt.Errorf("invalid slippage (must be greater than 0 )")
 			} else if slippage > 100 {
 				slippageEntryCorrect = false
 				slippageSaveBtn.Disable()
+				slippageSaveBtn.Refresh()
 				checkSwapBtnState()
 				return fmt.Errorf("invalid slippage (must be less than 100 )")
 			} else {
@@ -598,17 +601,24 @@ func createDexContent(creds Credentials) *container.Scroll {
 					currentDexSlippage = slippage
 					fmt.Println("Slipage save btn enabled")
 					slippageSaveBtn.Enable()
-					slippageSaveBtn.Refresh()
+
 				} else {
 					fmt.Println("Slipage save btn disabled")
 					slippageSaveBtn.Disable()
-					slippageSaveBtn.Refresh()
+
 				}
+				fmt.Printf("price impact %v,current slippage %v, swapbutton state %v\n ", priceImpact, currentDexSlippage, swapBtn.Disabled())
 				if priceImpact < currentDexSlippage && swapBtn.Disabled() { //for enabling swap button after user changes slippage
 					amountEntry.Validate()
 					outAmountEntry.Validate()
 					priceImpactIsNotHigh = true
+
+				} else if priceImpact > currentDexSlippage && !swapBtn.Disabled() {
+					amountEntry.Validate()
+					outAmountEntry.Validate()
+					priceImpactIsNotHigh = false
 				}
+				slippageSaveBtn.Refresh()
 				checkSwapBtnState()
 				return nil
 			}
@@ -717,20 +727,20 @@ func createDexContent(creds Credentials) *container.Scroll {
 			}
 		}
 
-		outAmountEntry.OnChanged = func(s string) {
+		outAmountEntry.Validator = func(s string) error {
 			tokenData, _ := updateOrCheckCache(tokenOutSelect.Selected, 3, "check")
 			outAmount, err := convertUserInputToBigInt(s, tokenData.Decimals)
 			if err != nil {
 				warningMessageBinding.Set(err.Error())
 				outAmountEntryCorrect = false
 				checkSwapBtnState()
-				return
+				return err
 			}
 			if outAmount.Cmp(big.NewInt(0)) <= 0 {
 				warningMessageBinding.Set("In amount is too small")
 				outAmountEntryCorrect = false
 				checkSwapBtnState()
-				return
+				return fmt.Errorf("in amount is too small")
 			}
 			if tokenOutSelect.Selected == selectedPoolData.Reserve1.Symbol {
 
@@ -738,7 +748,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 
 				if err != nil {
 					warningMessageBinding.Set(err.Error())
-					return
+					return err
 				}
 				inAmountStr := formatBalance(*estInAmount, selectedPoolData.Reserve2.Decimal)
 				amountEntry.Text = inAmountStr
@@ -751,7 +761,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 				impact, _, estInAmount, err := calculateSwapAndPriceImpact(nil, outAmount, selectedPoolData.Reserve1.Amount, selectedPoolData.Reserve2.Amount, "swapIn") //(inAmount, inReserve, outReserve)
 				if err != nil {
 					warningMessageBinding.Set(err.Error())
-					return
+					return err
 				}
 				inAmountStr := formatBalance(*estInAmount, selectedPoolData.Reserve1.Decimal)
 				amountEntry.Text = inAmountStr
@@ -762,6 +772,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 				outAmountEntryCorrect = true
 				checkSwapBtnState()
 			}
+			return nil
 
 		}
 		// outAmountEntry.Disable()
