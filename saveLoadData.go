@@ -28,6 +28,7 @@ type WalletSettings struct {
 	CustomRpcLink     string   `json:"custom_rpc_link"`
 	NetworkType       string   `json:"network_type"`
 	DexSlippage       float64  `json:"dex_slippage"`
+	DexBaseFeeLimit   *big.Int `json:"dex_base_fee_limit"`
 }
 
 var client rpc.PhantasmaRPC
@@ -39,7 +40,7 @@ var defaultSettings = WalletSettings{
 	SendOnly:          false,
 	NetworkName:       "mainnet", // default network settings
 	ChainName:         "main",
-	DefaultGasLimit:   big.NewInt(21000),
+	DefaultGasLimit:   big.NewInt(10000),
 	GasLimitSliderMax: 100000,
 	GasLimitSliderMin: 10000,
 	GasPrice:          big.NewInt(100000),
@@ -48,6 +49,7 @@ var defaultSettings = WalletSettings{
 	RpcType:           "mainnet",
 	NetworkType:       "Mainnet",
 	DexSlippage:       5,
+	DexBaseFeeLimit:   big.NewInt(26000),
 }
 
 func saveAddressBook(adrBk addressBook, pwd string) error {

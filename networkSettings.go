@@ -46,15 +46,17 @@ func showNetworkSettingsPage(creds Credentials) {
 	customChainTxExplorerLinkEntry.Disable()
 
 	defaultFeeLimit := widget.NewEntry()
+	dexBaseGasLimit := widget.NewEntry()
 	feeLimitSliderMin := widget.NewEntry()
 	feeLimitSliderMax := widget.NewEntry()
+	dexBaseGasLimit.SetText(userSettings.DexBaseFeeLimit.String())
 	feePrice := widget.NewEntry()
 	defaultFeeLimit.SetText(userSettings.DefaultGasLimit.String())
 	feeLimitSliderMin.SetText(strconv.FormatFloat(userSettings.GasLimitSliderMin, 'f', -1, 64))
 	feeLimitSliderMax.SetText(strconv.FormatFloat(userSettings.GasLimitSliderMax, 'f', -1, 64))
 	feePrice.SetText(userSettings.GasPrice.String())
 
-	feeExplain := widget.NewRichTextFromMarkdown("When you perform transactions on the blockchain, certain fees are involved. Here's what you need to know:\n\n1- **Fee Limit:** This is the maximum amount of tokens that can be used for a transaction. In our wallet, we have set a default value for the fee limit which is optimized for staking transactions. This means that the default limit is high enough to handle the number of operations typically involved in staking.\n\n2- **Adjustable Fee Limit:** For other types of transactions, such as sending tokens, you might not need such a high fee limit. To give you flexibility, we provide a slider that allows you to adjust the fee limit before you send your transaction. You can increase or decrease it depending on the complexity of your transaction.\n\n3- **Fee Price:** This is the cost per unit of the fee tokens. In the Phantasma blockchain, the fee token is Kcal, and the settings you adjust in the wallet are done in Sparks. Note that 1 Kcal equals 1,000,000,000 Sparks. Higher fee prices mean your transaction will be processed faster, as transactions with higher fees are given higher priority when the blockchain is busy.\n\n**How It Works**\n\n* **For Staking** Transactions: The default fee limit is set to ensure smooth processing. You can adjust it too.\n\n* **For Other Transactions:** Adjust the fee limit using the slider to match the complexity of your transaction.\n\n* **Higher Fee Limit:** Use for transactions with many operations, ensuring they go through successfully.\n\n* **Lower Fee Limit:** Use for simpler transactions to save on fees.\n\nBy understanding these settings, you can better manage your transaction costs and ensure your transactions are processed efficiently.")
+	feeExplain := widget.NewRichTextFromMarkdown("When you perform transactions on the blockchain, certain fees are involved. Here's what you need to know:\n\n1- **Fee Limit:** This is the maximum amount of tokens that can be used for a transaction. In Spallet, we have set a default value for the fee limit which is default fee limit for hodling transactions and token sends. Dex base fee limit is for interacting one pool if more pools involved your fee limit will be increased.\n\n2- **Adjustable Fee Limit:** For other types of transactions, such as sending tokens, you might not need such a high fee limit. To give you flexibility, we provide a slider that allows you to adjust the fee limit before you send your transaction. You can increase or decrease it depending on the complexity of your transaction.\n\n3- **Fee Price:** This is the cost per unit of the fee tokens. In the Phantasma blockchain, the fee token is Kcal, and the settings you adjust in the wallet are done in Sparks. Note that 1 Kcal equals 10,000,000,000 Sparks. Higher fee prices mean your transaction will be processed faster, as transactions with higher fees are given higher priority when the blockchain is busy.\n\n**How It Works**\n\n**For Hodling Transactions:** The default fee limit is set to ensure smooth processing. You can adjust it too.\n\n* **For Other Transactions:** Adjust the fee limit using the slider to match the complexity of your transaction.\n\n* **Higher Fee Limit:** Use for transactions with many operations, ensuring they go through successfully.\n\n* **Lower Fee Limit:** Use for simpler transactions to save on fees.\n\nBy understanding these settings, you can better manage your transaction costs and ensure your transactions are processed efficiently.")
 	feeExplain.Wrapping = fyne.TextWrapWord
 	feeExplainCntnt := container.NewVScroll(feeExplain)
 	feeExplainCntnt.Resize(fyne.NewSize(500, 550))
@@ -64,6 +66,7 @@ func showNetworkSettingsPage(creds Credentials) {
 	feeSettingsForm := widget.NewForm(
 		widget.NewFormItem("Fee Price", feePrice),
 		widget.NewFormItem("Default Fee Limit", defaultFeeLimit),
+		widget.NewFormItem("Dex Base Fee Limit", dexBaseGasLimit),
 		widget.NewFormItem("", widget.NewLabel("Fee limit Slider Settings")),
 		widget.NewFormItem("Max", feeLimitSliderMax),
 		widget.NewFormItem("Min", feeLimitSliderMin),
@@ -72,6 +75,7 @@ func showNetworkSettingsPage(creds Credentials) {
 
 	// Inner validation function
 	validateEntries := func() {
+		dexBaseGasLimitValue, dexFeeErr := new(big.Int).SetString(dexBaseGasLimit.Text, 10)
 		defaultFeeLimitValue, defErr := new(big.Int).SetString(defaultFeeLimit.Text, 10)
 		feeLimitSliderMinValue, minErr := strconv.ParseFloat(feeLimitSliderMin.Text, 64)
 		feeLimitSliderMaxValue, maxErr := strconv.ParseFloat(feeLimitSliderMax.Text, 64)
@@ -79,11 +83,11 @@ func showNetworkSettingsPage(creds Credentials) {
 
 		valid := true
 
-		if !defErr || minErr != nil || maxErr != nil || !priceErr {
+		if !defErr || minErr != nil || maxErr != nil || !priceErr || dexFeeErr {
 			valid = false
 		}
 
-		if valid && (defaultFeeLimitValue.Cmp(big.NewInt(int64(feeLimitSliderMinValue))) < 0 || defaultFeeLimitValue.Cmp(big.NewInt(int64(feeLimitSliderMaxValue))) > 0) {
+		if valid && (dexBaseGasLimitValue.Cmp(big.NewInt(25000)) >= 0 || defaultFeeLimitValue.Cmp(big.NewInt(int64(feeLimitSliderMinValue))) < 0 || defaultFeeLimitValue.Cmp(big.NewInt(int64(feeLimitSliderMaxValue))) > 0) {
 			valid = false
 		}
 
@@ -107,6 +111,7 @@ func showNetworkSettingsPage(creds Credentials) {
 	}
 
 	// Add validation to entries
+	dexBaseGasLimit.OnChanged = func(string) { validateEntries() }
 	defaultFeeLimit.OnChanged = func(string) { validateEntries() }
 	feeLimitSliderMin.OnChanged = func(string) { validateEntries() }
 	feeLimitSliderMax.OnChanged = func(string) { validateEntries() }
@@ -175,6 +180,7 @@ func showNetworkSettingsPage(creds Credentials) {
 			userSettings.ChainName = settingsForSave.ChainName
 			userSettings.RpcType = settingsForSave.RpcType
 			userSettings.NetworkType = settingsForSave.NetworkType
+
 		} else {
 			userSettings.ChainName = customChainNameEntry.Text
 			userSettings.NetworkName = customChainNetworkEntry.Text
@@ -188,6 +194,7 @@ func showNetworkSettingsPage(creds Credentials) {
 		settingsForSave.GasLimitSliderMin, _ = strconv.ParseFloat(feeLimitSliderMin.Text, 64)
 		settingsForSave.DefaultGasLimit, _ = new(big.Int).SetString(defaultFeeLimit.Text, 10)
 		settingsForSave.GasPrice, _ = new(big.Int).SetString(feePrice.Text, 10)
+		userSettings.DexBaseFeeLimit, _ = new(big.Int).SetString(dexBaseGasLimit.Text, 10)
 
 		userSettings.GasLimitSliderMin = settingsForSave.GasLimitSliderMin
 		userSettings.GasLimitSliderMax = settingsForSave.GasLimitSliderMax

@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -19,17 +21,10 @@ import (
 	scriptbuilder "github.com/phantasma-io/phantasma-go/pkg/vm/script_builder"
 )
 
-var dexGasLimit = big.NewInt(30000)
-
-type DexPools struct {
-	PoolKeyCount int      `json:"pool_count"`
-	PoolList     []string `json:"pool_list"`
-}
-
 type PoolReserve struct {
 	Symbol  string
-	Amount  *big.Int
 	Decimal int
+	Amount  *big.Int
 }
 
 type Pool struct {
@@ -37,7 +32,30 @@ type Pool struct {
 	Reserve2 PoolReserve
 }
 
-var selectedPoolData Pool
+type TransactionDataForDex struct {
+	AmountIn *big.Int
+	TokenIn  string
+	TokenOut string
+	Pool     string
+}
+
+type CachedPoolData struct {
+	Pool    Pool
+	Updated time.Time
+}
+
+var (
+	poolCache     = make(map[string]CachedPoolData)
+	cacheDuration = 15 * time.Second
+	// poolUpdateInterval = 15 * time.Second
+	mu sync.Mutex
+)
+
+type DexPools struct {
+	PoolKeyCount int      `json:"pool_count"`
+	PoolList     []string `json:"pool_list"`
+}
+
 var latestDexPools DexPools
 
 func generateFromList(userTokens []string, pools []string) []string {
@@ -134,30 +152,39 @@ func removeKey(poolWithKey string) string {
 }
 
 func generateToList(fromToken string, pools []string) []string {
+	tokenSet := make(map[string]bool)
 	var toList []string
 
 	for _, pool := range pools {
 		tokens := strings.Split(pool, "_")
-		if tokens[0] == fromToken {
-			toList = append(toList, tokens[1])
-		} else if tokens[1] == fromToken {
-			toList = append(toList, tokens[0])
+		if tokens[0] != fromToken {
+			if !tokenSet[tokens[0]] {
+				tokenSet[tokens[0]] = true
+				toList = append(toList, tokens[0])
+			}
+		}
+
+		if tokens[1] != fromToken {
+			if !tokenSet[tokens[1]] {
+				tokenSet[tokens[1]] = true
+				toList = append(toList, tokens[1])
+			}
 		}
 	}
 
 	return toList
 }
 
-func selectedPool(inToken, outToken string) string {
-	for _, pool := range latestDexPools.PoolList {
-		if strings.Contains(pool, inToken) {
-			if strings.Contains(pool, outToken) {
-				return pool
-			}
-		}
-	}
-	return ""
-}
+// func selectedPool(inToken, outToken string) string {
+// 	for _, pool := range latestDexPools.PoolList {
+// 		if strings.Contains(pool, inToken) {
+// 			if strings.Contains(pool, outToken) {
+// 				return pool
+// 			}
+// 		}
+// 	}
+// 	return ""
+// }
 
 func getCountOfTokenPairsAndReserveKeys() int {
 	sb := scriptbuilder.BeginScript()
@@ -178,6 +205,15 @@ func getCountOfTokenPairsAndReserveKeys() int {
 
 // gets pool reserves from pool name
 func getPoolReserves(pool string) Pool {
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Check if the pool data is in the cache and is up-to-date
+	if cachedData, found := poolCache[pool]; found && time.Since(cachedData.Updated) < cacheDuration {
+		return cachedData.Pool
+	}
+
+	// Your existing implementation for fetching pool reserves
 	poolReserveTokens := strings.Split(pool, "_")
 	poolReserve1 := pool + "_" + poolReserveTokens[0]
 	poolReserve2 := pool + "_" + poolReserveTokens[1]
@@ -196,20 +232,311 @@ func getPoolReserves(pool string) Pool {
 	token1Data, _ := updateOrCheckCache(poolReserveTokens[0], 3, "check")
 	token2Data, _ := updateOrCheckCache(poolReserveTokens[1], 3, "check")
 
-	poolData := Pool{Reserve1: PoolReserve{
-		Symbol:  poolReserveTokens[0],
-		Decimal: token1Data.Decimals,
-		Amount:  reserve1,
-	}, Reserve2: PoolReserve{
-		Symbol:  poolReserveTokens[1],
-		Decimal: token2Data.Decimals,
-		Amount:  reserve2,
-	},
+	poolData := Pool{
+		Reserve1: PoolReserve{
+			Symbol:  poolReserveTokens[0],
+			Decimal: token1Data.Decimals,
+			Amount:  reserve1,
+		},
+		Reserve2: PoolReserve{
+			Symbol:  poolReserveTokens[1],
+			Decimal: token2Data.Decimals,
+			Amount:  reserve2,
+		},
 	}
 	fmt.Printf("%v reserve: %v\n%v reserve: %v\n", poolReserveTokens[0], formatBalance(*poolData.Reserve1.Amount, poolData.Reserve1.Decimal), poolReserveTokens[1], formatBalance(*poolData.Reserve2.Amount, poolData.Reserve2.Decimal))
-	return poolData
 
+	// Store the fetched pool data in the cache
+	poolCache[pool] = CachedPoolData{Pool: poolData, Updated: time.Now()}
+
+	return poolData
 }
+
+/**
+ * findAllSwapRoutes finds all possible swap routes between two tokens.
+ *
+ * @param pools           List of pool pairs in the format "TOKEN1_TOKEN2".
+ * @param fromToken       The starting token for the swap.
+ * @param toToken         The destination token for the swap.
+ * @return allRoutes      All possible routes as a list of lists of pools.
+ */
+func findAllSwapRoutes(pools []string, fromToken, toToken string) ([][]string, error) {
+	var allRoutes [][]string
+
+	// Build a map of pools to easily find connections between tokens
+	poolMap := make(map[string][]string)
+	for _, pool := range pools {
+		tokens := strings.Split(pool, "_")
+		poolMap[tokens[0]] = append(poolMap[tokens[0]], tokens[1])
+		poolMap[tokens[1]] = append(poolMap[tokens[1]], tokens[0])
+	}
+
+	// Depth-First Search (DFS) to find all possible routes
+	var dfs func(currentToken string, visited map[string]bool, currentRoute []string)
+	dfs = func(currentToken string, visited map[string]bool, currentRoute []string) {
+		// Base case: If we reach the destination token, add the current route to allRoutes
+		if currentToken == toToken {
+			allRoutes = append(allRoutes, append([]string(nil), currentRoute...))
+			return
+		}
+
+		// Recursive case: Explore connected tokens (pools)
+		for _, nextToken := range poolMap[currentToken] {
+			if !visited[nextToken] && nextToken != "" {
+				visited[nextToken] = true
+				currentRoute = append(currentRoute, currentToken+"_"+nextToken)
+				dfs(nextToken, visited, currentRoute)
+				currentRoute = currentRoute[:len(currentRoute)-1]
+				visited[nextToken] = false
+			}
+		}
+	}
+
+	// Initialize visited map and start DFS from the fromToken
+	visited := make(map[string]bool)
+	visited[fromToken] = true
+	dfs(fromToken, visited, []string{})
+
+	// Ensure we do not return incomplete routes
+	filteredRoutes := [][]string{}
+	for _, route := range allRoutes {
+		valid := true
+		for _, step := range route {
+			tokens := strings.Split(step, "_")
+			if len(tokens) != 2 || tokens[0] == "" || tokens[1] == "" {
+				valid = false
+				break
+			}
+		}
+		if valid {
+			fmt.Println("found valid route", route)
+			filteredRoutes = append(filteredRoutes, route)
+		}
+	}
+	if len(filteredRoutes) == 0 {
+		return nil, errors.New("no valid route found")
+	}
+
+	return filteredRoutes, nil
+}
+
+/**
+ * reverseCalculateInputAmounts calculates the input amounts required to achieve a specific output amount along a given route.
+ *
+ * @param route            The best route as a list of pools.
+ * @param desiredOutAmount The desired output amount.
+ * @param pools            List of pool pairs in the format "TOKEN1_TOKEN2".
+ * @return calculatedInAmount The calculated input amount to achieve the desired output amount.
+ * @return error           Any error encountered during the computation.
+ */
+func reverseCalculateInputAmounts(route []string, desiredOutAmount *big.Int, pools []string) (*big.Int, error) {
+	currentOutAmount := new(big.Int).Set(desiredOutAmount)
+
+	// Function to get correct pool reserves by considering the order of tokens
+	getCorrectPoolReserves := func(token1, token2 string) (string, Pool) {
+		poolKey := token1 + "_" + token2
+		reverseKey := token2 + "_" + token1
+		pool := Pool{}
+		if contains(pools, poolKey) {
+			pool = getPoolReserves(poolKey)
+		} else if contains(pools, reverseKey) {
+			pool = getPoolReserves(reverseKey)
+			pool.Reserve1, pool.Reserve2 = pool.Reserve2, pool.Reserve1 // Swap reserves
+			poolKey = reverseKey
+		}
+		return poolKey, pool
+	}
+
+	// Iterate through the route in reverse to calculate required input amounts
+	for i := len(route) - 1; i >= 0; i-- {
+		pool := route[i]
+		tokens := strings.Split(pool, "_")
+		tokenIn, tokenOut := tokens[0], tokens[1]
+
+		_, poolReserves := getCorrectPoolReserves(tokenIn, tokenOut)
+
+		// Calculate the required input amount using calculateSwapIn
+		inAmount, err := calculateSwapIn(currentOutAmount, poolReserves.Reserve1.Amount, poolReserves.Reserve2.Amount)
+		if err != nil {
+			return nil, err
+		}
+
+		// Update the current out amount for the previous swap step
+		currentOutAmount = inAmount
+	}
+
+	return currentOutAmount, nil
+}
+
+/**
+ * evaluateRoutes finds the best swap route among all possible routes by calculating price impacts or maximizing output amount.
+ *
+ * @param routes               All possible routes as a list of lists of pools.
+ * @param fromToken            The starting token for the swap.
+ * @param pools                List of pool pairs in the format "TOKEN1_TOKEN2".
+ * @param inAmount             The amount of the starting token to swap.
+ * @param slippageTolerance    Maximum allowable price impact for selecting the best priced pool.
+ * @param selectionMethod      Selection method for the best route: "highestOutput", "lowestImpact", "auto".
+ * @return bestRoute           The best route as a list of pools.
+ * @return bestTransactionData The transaction data for the best route.
+ * @return lowestPriceImpact   The lowest price impact for the best route.
+ * @return bestRouteString     The best route as a string in the format "token1=>token2=>token3".
+ * @return numPools            The number of pools used in the best route.
+ * @return finalOutAmount      The final output amount for the best route.
+ * @return error               Any error encountered during the computation.
+ */
+func evaluateRoutes(routes [][]string, fromToken string, pools []string, inAmount *big.Int, slippageTolerance float64, selectionMethod string) ([]string, []TransactionDataForDex, float64, string, int, *big.Int, error) {
+	var bestRoute []string                                       // Stores the best route as a list of pools
+	var lowestPriceImpactRoute []string                          // Stores the route with the lowest price impact
+	var highestOutputRoute []string                              // Stores the route with the highest output amount
+	var lowestPriceImpactTransactionData []TransactionDataForDex // Stores the transaction data for the lowest price impact route
+	var highestOutputTransactionData []TransactionDataForDex     // Stores the transaction data for the highest output route
+	var lowestPriceImpact float64 = -1                           // Tracks the lowest price impact found
+	var highestOutputPriceImpact float64 = -1                    // Tracks the price impact of the highest output route
+	var lowestPriceImpactRouteString string                      // Stores the best route as a formatted string for the lowest price impact route
+	var highestOutputRouteString string                          // Stores the best route as a formatted string for the highest output route
+	var numPools int                                             // Stores the number of pools used in the best route
+	var finalOutAmount *big.Int                                  // Stores the final output amount for the best route
+	var highestOutputAmount *big.Int                             // Stores the final output amount for the highest output route
+	var bestRouteString string
+	var bestTransactionData []TransactionDataForDex
+	fmt.Println("*****evaluating routes******")
+
+	// Function to get correct pool reserves by considering the order of tokens
+	getCorrectPoolReserves := func(token1, token2 string) (string, Pool) {
+		poolKey := token1 + "_" + token2
+		reverseKey := token2 + "_" + token1
+		pool := Pool{}
+		if contains(pools, poolKey) {
+			pool = getPoolReserves(poolKey)
+		} else if contains(pools, reverseKey) {
+			pool = getPoolReserves(reverseKey)
+			pool.Reserve1, pool.Reserve2 = pool.Reserve2, pool.Reserve1 // Swap reserves
+			poolKey = reverseKey
+		}
+		return poolKey, pool
+	}
+
+	// Iterate through all routes to find the lowest price impact route and highest output route
+	for _, route := range routes {
+		var currentAmount *big.Int = new(big.Int).Set(inAmount)
+		var currentTransactionData []TransactionDataForDex
+		var currentRouteString []string = []string{fromToken}
+		var totalPriceImpact float64 = 0
+		var priceImpactFactor float64 = 1.0
+
+		for _, pool := range route {
+			tokens := strings.Split(pool, "_")
+			currentToken, nextToken := tokens[0], tokens[1]
+			fmt.Println("trying to get correct pools for", currentToken, nextToken)
+			poolKey, poolReserves := getCorrectPoolReserves(currentToken, nextToken)
+			priceImpact, outAmount, _, _ := calculateSwapAndPriceImpact(currentAmount, nil, poolReserves.Reserve1.Amount, poolReserves.Reserve2.Amount, "swapOut")
+
+			// If outAmount is nil, skip this route
+			if outAmount == nil {
+				totalPriceImpact = -1
+				break
+			}
+
+			// Calculate the compounding effect of price impact
+			priceImpactFactor *= (1 - (priceImpact / 100))
+			totalPriceImpact = (1 - priceImpactFactor) * 100
+
+			currentTransactionData = append(currentTransactionData, TransactionDataForDex{
+				AmountIn: new(big.Int).Set(currentAmount),
+				TokenIn:  currentToken,
+				TokenOut: nextToken,
+				Pool:     poolKey,
+			})
+			currentAmount = outAmount
+			currentRouteString = append(currentRouteString, nextToken)
+		}
+
+		// Compare routes to find the lowest price impact route
+		if totalPriceImpact != -1 && (lowestPriceImpact == -1 || totalPriceImpact < lowestPriceImpact) {
+			lowestPriceImpact = totalPriceImpact
+			lowestPriceImpactRoute = route
+			lowestPriceImpactTransactionData = currentTransactionData
+			lowestPriceImpactRouteString = strings.Join(currentRouteString, " > ")
+		}
+
+		// Compare routes to find the highest output route
+		if totalPriceImpact != -1 && (highestOutputAmount == nil || (currentAmount.Cmp(highestOutputAmount) > 0)) {
+			highestOutputAmount = currentAmount
+			highestOutputPriceImpact = totalPriceImpact
+			highestOutputRoute = route
+			highestOutputTransactionData = currentTransactionData
+			highestOutputRouteString = strings.Join(currentRouteString, " > ")
+		}
+	}
+
+	// Check if a valid route was found
+	if len(highestOutputRoute) == 0 || len(lowestPriceImpactRoute) == 0 {
+		return nil, nil, 0, "", 0, nil, errors.New("no valid route found")
+	}
+
+	// Select the best route based on the selection method
+	switch selectionMethod {
+	case "highestOutput":
+		bestRoute = highestOutputRoute
+		bestTransactionData = highestOutputTransactionData
+		bestRouteString = highestOutputRouteString
+		finalOutAmount = highestOutputAmount
+		lowestPriceImpact = highestOutputPriceImpact // Store the corresponding price impact
+
+	case "lowestImpact":
+		bestRoute = lowestPriceImpactRoute
+		bestTransactionData = lowestPriceImpactTransactionData
+		bestRouteString = lowestPriceImpactRouteString
+		finalOutAmount = lowestPriceImpactTransactionData[len(lowestPriceImpactTransactionData)-1].AmountIn // Last AmountIn is the final output amount
+
+	case "auto":
+		if highestOutputPriceImpact != -1 && highestOutputPriceImpact <= slippageTolerance {
+			bestRoute = highestOutputRoute
+			bestTransactionData = highestOutputTransactionData
+			bestRouteString = highestOutputRouteString
+			finalOutAmount = highestOutputAmount
+			lowestPriceImpact = highestOutputPriceImpact // Store the corresponding price impact
+		} else {
+			bestRoute = lowestPriceImpactRoute
+			bestTransactionData = lowestPriceImpactTransactionData
+			bestRouteString = lowestPriceImpactRouteString
+			finalOutAmount = lowestPriceImpactTransactionData[len(lowestPriceImpactTransactionData)-1].AmountIn // Last AmountIn is the final output amount
+		}
+
+	default:
+		return nil, nil, 0, "", 0, nil, errors.New("invalid selection method")
+	}
+
+	numPools = len(bestRoute)
+
+	return bestRoute, bestTransactionData, lowestPriceImpact, bestRouteString, numPools, finalOutAmount, nil
+}
+
+// Helper function to check if a slice contains a specific string
+func contains(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
+}
+
+// func calculateTotalPriceImpact(route []string, inAmount *big.Int) float64 {
+// 	totalPriceImpact := 0.0
+// 	currentAmount := inAmount
+
+// 	for _, pool := range route {
+// 		fmt.Println("calculating price impact for", pool)
+// 		poolReserves := getPoolReserves(pool)
+// 		priceImpact, outAmount, _, _ := calculateSwapAndPriceImpact(currentAmount, nil, poolReserves.Reserve1.Amount, poolReserves.Reserve2.Amount, "swapOut")
+// 		totalPriceImpact += priceImpact
+// 		currentAmount = outAmount
+// 	}
+
+// 	return totalPriceImpact
+// }
 
 func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) (*big.Int, error) {
 
@@ -290,21 +617,24 @@ func calculateSwapIn(outAmount, inReserves, outReserves *big.Int) (*big.Int, err
 	return inAmount, nil
 }
 
-// calculateSwapAndPriceImpact calculates the price impact of a swap on a DEX and returns the estimated output and input amounts.
-// Parameters:
-// - inAmount: The amount of the input token you want to swap.
-// - outAmount: The desired amount of the output token you want to receive.
-// - inReserves: The current reserves of the input token in the liquidity pool.
-// - outReserves: The current reserves of the output token in the liquidity pool.
-// - swapType: A string indicating the type of swap, either "swapOut" (input to output) or "swapIn" (output to input).
-// Returns:
-// - float64: The price impact as a percentage.
-// - *big.Int: The estimated output amount for the swapOut type.
-// - *big.Int: The estimated input amount for the swapIn type.
-// - error: Any error encountered during the calculation.
+/**
+ * calculateSwapAndPriceImpact calculates the price impact of a swap on a DEX and returns the estimated output and input amounts.
+ *
+ * @param inAmount          The amount of the input token you want to swap.
+ * @param outAmount         The desired amount of the output token you want to receive.
+ * @param inReserves        The current reserves of the input token in the liquidity pool.
+ * @param outReserves       The current reserves of the output token in the liquidity pool.
+ * @param swapType          A string indicating the type of swap, either "swapOut" (input to output) or "swapIn" (output to input).
+ * @return float64          The price impact as a percentage.
+ * @return *big.Int         The estimated output amount for the swapOut type.
+ * @return *big.Int         The estimated input amount for the swapIn type.
+ * @return error            Any error encountered during the calculation.
+ */
 func calculateSwapAndPriceImpact(inAmount, outAmount, inReserves, outReserves *big.Int, swapType string) (float64, *big.Int, *big.Int, error) {
 	fmt.Printf("*****Calculate Swap and price impact*****\nIn amount %v\noutAmount %v\nIn Reserves %v\nOut Reserves %v\nSwap Type %v\n", inAmount, outAmount, inReserves, outReserves, swapType)
-
+	if (inAmount == nil && outAmount == nil) || inReserves == nil || outReserves == nil {
+		return 0, nil, nil, errors.New("cant calculate swap and price impact")
+	}
 	initialPrice := new(big.Float).Quo(new(big.Float).SetInt(outReserves), new(big.Float).SetInt(inReserves))
 
 	var finalInReserves, finalOutReserves *big.Int
@@ -340,7 +670,8 @@ func calculateSwapAndPriceImpact(inAmount, outAmount, inReserves, outReserves *b
 }
 
 func createDexContent(creds Credentials) *container.Scroll {
-	fee := new(big.Int).Mul(dexGasLimit, userSettings.GasPrice)
+	currentDexFeeLimit, _ := new(big.Int).SetString(userSettings.DexBaseFeeLimit.String(), 10)
+	fee := new(big.Int).Mul(currentDexFeeLimit, userSettings.GasPrice)
 	err := checkFeeBalance(fee)
 	var priceImpact float64
 	var currentDexSlippage = userSettings.DexSlippage
@@ -350,6 +681,9 @@ func createDexContent(creds Credentials) *container.Scroll {
 	var outAmountEntryCorrect bool
 	var slippageEntryCorrect bool
 	var priceImpactIsNotHigh bool
+	var dexTransaction []TransactionDataForDex
+	var dexPayload string
+	var bestRoute []string
 	if err == nil {
 		loadDexPools()
 
@@ -358,6 +692,8 @@ func createDexContent(creds Credentials) *container.Scroll {
 		amountEntry := widget.NewEntry()
 		amountEntry.SetPlaceHolder("Amount")
 		amountEntry.Disable()
+		routeMesssageBinding := binding.NewString()
+		routeMessage := widget.NewLabelWithData(routeMesssageBinding)
 		warningMessageBinding := binding.NewString()
 		warningMessageBinding.Set("Please select in token")
 		warningMessage := widget.NewLabelWithData(warningMessageBinding)
@@ -422,7 +758,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 			}
 
 			// Check KCAL for gas
-			gasFee := new(big.Int).Mul(userSettings.GasPrice, dexGasLimit)
+			gasFee := new(big.Int).Mul(userSettings.GasPrice, currentDexFeeLimit)
 			if err := checkFeeBalance(gasFee); err != nil {
 				dialog.ShowError(err, mainWindowGui)
 				return
@@ -441,7 +777,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 
 			dialog.ShowConfirm("Confirm Swap", confirmMessage, func(confirmed bool) {
 				if confirmed {
-					err = executeSwap(tokenInSelect.Selected, tokenOutSelect.Selected, amount, slippage, creds)
+					err = executeSwap(dexTransaction, currentDexSlippage, creds, currentDexFeeLimit, dexPayload)
 					if err != nil {
 						dialog.ShowError(err, mainWindowGui)
 					}
@@ -472,72 +808,72 @@ func createDexContent(creds Credentials) *container.Scroll {
 				outTokenSelected = true
 				checkSwapBtnState()
 				outAmountEntry.Enable()
-
-				pool := selectedPool(tokenInSelect.Selected, s)
-				selectedPoolData = getPoolReserves(pool)
 				inAmount, _ := convertUserInputToBigInt(amountEntry.Text, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals)
-				if selectedPoolData.Reserve1.Symbol == tokenInSelect.Selected {
-					inReserve := selectedPoolData.Reserve1.Amount
-					outReserve := selectedPoolData.Reserve2.Amount
-					impact, estOutAmount, _, err := calculateSwapAndPriceImpact(inAmount, nil, inReserve, outReserve, "swapOut") //(inAmount, inReserve, outReserve)
-					if err != nil {
-						outAmountEntryCorrect = false
-						checkSwapBtnState()
-						warningMessageBinding.Set(err.Error())
-						return
-					}
-					priceImpact = impact
-					if priceImpact > userSlippage {
-						priceImpactIsNotHigh = false
-						warningMessageBinding.Set(fmt.Sprintf("Price impact is too high, current price impact %.2f%%", priceImpact))
-						estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve2.Decimal)
-						outAmountEntry.Text = (estOutAmountStr)
-						outAmountEntry.Refresh()
-						checkSwapBtnState()
-						return
-					} else {
-						priceImpactIsNotHigh = true
-						inAmountEntryCorrect = true
-						checkSwapBtnState()
-					}
-					estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve2.Decimal)
-					outAmountEntry.Text = estOutAmountStr
-					outAmountEntryCorrect = true
+				fmt.Println("finding best route for", inAmount.String(), tokenInSelect.Selected, tokenOutSelect.Selected)
+				swapRoutes, err := findAllSwapRoutes(latestDexPools.PoolList, tokenInSelect.Selected, tokenOutSelect.Selected)
+				if err != nil {
+					outAmountEntryCorrect = false
 					checkSwapBtnState()
-					warningMessageBinding.Set(fmt.Sprintf("You can swap from %s to %s with price impact %.2f%%", tokenInSelect.Selected, tokenOutSelect.Selected, impact))
-					outAmountEntry.Refresh()
+					warningMessageBinding.Set(err.Error())
+					return
+				}
+				foundBestRoute, txData, impact, route, poolCount, estOutAmount, err := evaluateRoutes(swapRoutes, tokenInSelect.Selected, latestDexPools.PoolList, inAmount, currentDexSlippage, "auto")
+				routeMesssageBinding.Set(route)
+				bestRoute = foundBestRoute
+				dexPayload = "Spallet Swap " + route
+				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), userSettings.DexBaseFeeLimit)
+				if tokenInSelect.Selected == "KCAL" {
+					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
+					max := new(big.Int).Add(inAmount, fee)
+					err := checkFeeBalance(max)
+					if err != nil {
+						inAmountEntryCorrect = false
+						checkSwapBtnState()
+						warningMessageBinding.Set("Not enough Kcal")
+						return
+
+					}
 
 				} else {
-					inReserve := selectedPoolData.Reserve2.Amount
-					outReserve := selectedPoolData.Reserve1.Amount
-					impact, estOutAmount, _, err := calculateSwapAndPriceImpact(inAmount, nil, inReserve, outReserve, "swapOut")
+					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
+					err := checkFeeBalance(fee)
 					if err != nil {
-						outAmountEntryCorrect = false
-						warningMessageBinding.Set(err.Error())
+						inAmountEntryCorrect = false
 						checkSwapBtnState()
+						warningMessageBinding.Set("Not enough Kcal")
 						return
+
 					}
-					priceImpact = impact
-					if priceImpact > userSlippage {
-						priceImpactIsNotHigh = false
-						warningMessageBinding.Set(fmt.Sprintf("Price impact is too high, current price impact %.2f%%", priceImpact))
-						estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve1.Decimal)
-						outAmountEntry.Text = (estOutAmountStr)
-						outAmountEntry.Refresh()
-						checkSwapBtnState()
-						return
-					} else {
-						priceImpactIsNotHigh = true
-						inAmountEntryCorrect = true
-						checkSwapBtnState()
-					}
-					estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve1.Decimal)
-					outAmountEntry.Text = estOutAmountStr
-					outAmountEntryCorrect = true
-					checkSwapBtnState()
-					warningMessageBinding.Set(fmt.Sprintf("You can swap from %s to %s with price impact %.2f%%", tokenInSelect.Selected, tokenOutSelect.Selected, impact))
-					outAmountEntry.Refresh()
+
 				}
+				dexTransaction = txData
+				if err != nil {
+					outAmountEntryCorrect = false
+					checkSwapBtnState()
+					warningMessageBinding.Set(err.Error())
+					return
+				}
+				outTokendata, _ := updateOrCheckCache(tokenOutSelect.Selected, 3, "check")
+				priceImpact = impact
+				if priceImpact > userSlippage {
+					priceImpactIsNotHigh = false
+					warningMessageBinding.Set(fmt.Sprintf("Price impact is too high, current price impact %.2f%%", priceImpact))
+					estOutAmountStr := formatBalance(*estOutAmount, outTokendata.Decimals)
+					outAmountEntry.Text = (estOutAmountStr)
+					outAmountEntry.Refresh()
+					checkSwapBtnState()
+					return
+				} else {
+					priceImpactIsNotHigh = true
+					inAmountEntryCorrect = true
+					checkSwapBtnState()
+				}
+				estOutAmountStr := formatBalance(*estOutAmount, outTokendata.Decimals)
+				outAmountEntry.Text = estOutAmountStr
+				outAmountEntryCorrect = true
+				checkSwapBtnState()
+				warningMessageBinding.Set(fmt.Sprintf("You can swap from %s to %s with price impact %.2f%%", tokenInSelect.Selected, tokenOutSelect.Selected, impact))
+				outAmountEntry.Refresh()
 
 			}
 		}
@@ -550,6 +886,93 @@ func createDexContent(creds Credentials) *container.Scroll {
 				checkSwapBtnState()
 				return err
 			}
+
+			if tokenOutSelect.Selected != "" {
+				var userSlippage float64
+
+				userSlippage, err = strconv.ParseFloat(slippageEntry.Text, 64)
+				if err != nil {
+					warningMessageBinding.Set("Check your slippage")
+					return fmt.Errorf("check your slippage")
+
+				}
+
+				outTokenSelected = true
+				checkSwapBtnState()
+				outAmountEntry.Enable()
+				// inAmount, _ := convertUserInputToBigInt(amountEntry.Text, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals)
+				fmt.Println("finding best route for", input, tokenInSelect.Selected, tokenOutSelect.Selected)
+				swapRoutes, err := findAllSwapRoutes(latestDexPools.PoolList, tokenInSelect.Selected, tokenOutSelect.Selected)
+				if err != nil {
+					outAmountEntryCorrect = false
+					checkSwapBtnState()
+					warningMessageBinding.Set(err.Error())
+					return err
+				}
+				foundBestRoute, txData, impact, route, poolCount, estOutAmount, err := evaluateRoutes(swapRoutes, tokenInSelect.Selected, latestDexPools.PoolList, input, currentDexSlippage, "auto")
+				if err != nil {
+					outAmountEntryCorrect = false
+					checkSwapBtnState()
+					warningMessageBinding.Set(err.Error())
+					return err
+
+				}
+				routeMesssageBinding.Set(route)
+				bestRoute = foundBestRoute
+				dexPayload = "Spallet Swap " + route
+				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), userSettings.DexBaseFeeLimit)
+
+				if tokenInSelect.Selected == "KCAL" {
+					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
+					max := new(big.Int).Add(input, fee)
+					err := checkFeeBalance(max)
+					if err != nil {
+						inAmountEntryCorrect = false
+						checkSwapBtnState()
+						warningMessageBinding.Set("Not enough Kcal")
+						return err
+
+					}
+
+				} else {
+					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
+					err := checkFeeBalance(fee)
+					if err != nil {
+						inAmountEntryCorrect = false
+						checkSwapBtnState()
+						warningMessageBinding.Set("Not enough Kcal")
+						return err
+
+					}
+
+				}
+
+				dexTransaction = txData
+
+				outTokendata, _ := updateOrCheckCache(tokenOutSelect.Selected, 3, "check")
+				priceImpact = impact
+				if priceImpact > userSlippage {
+					priceImpactIsNotHigh = false
+					warningMessageBinding.Set(fmt.Sprintf("Price impact is too high, current price impact %.2f%%", priceImpact))
+					estOutAmountStr := formatBalance(*estOutAmount, outTokendata.Decimals)
+					outAmountEntry.Text = (estOutAmountStr)
+					outAmountEntry.Refresh()
+					checkSwapBtnState()
+					return fmt.Errorf("price impact is too high")
+				} else {
+					priceImpactIsNotHigh = true
+					inAmountEntryCorrect = true
+					checkSwapBtnState()
+				}
+				estOutAmountStr := formatBalance(*estOutAmount, outTokendata.Decimals)
+				outAmountEntry.Text = estOutAmountStr
+				outAmountEntryCorrect = true
+				checkSwapBtnState()
+				warningMessageBinding.Set(fmt.Sprintf("You can swap from %s to %s with price impact %.2f%%", tokenInSelect.Selected, tokenOutSelect.Selected, impact))
+				outAmountEntry.Refresh()
+
+			}
+
 			if input.Cmp(big.NewInt(0)) <= 0 {
 				warningMessageBinding.Set("Please enter amount")
 
@@ -557,19 +980,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 				checkSwapBtnState()
 				return err
 			}
-			if tokenInSelect.Selected == "KCAL" {
-				fee := new(big.Int).Mul(dexGasLimit, defaultSettings.GasPrice)
-				max := new(big.Int).Add(input, fee)
-				err := checkFeeBalance(max)
-				if err != nil {
-					inAmountEntryCorrect = false
-					checkSwapBtnState()
-					warningMessageBinding.Set("Not enough Kcal")
-					return err
 
-				}
-
-			}
 			balance := latestAccountData.FungibleTokens[tokenInSelect.Selected].Amount
 			if input.Cmp(&balance) <= 0 {
 				if tokenOutSelect.Selected == "" {
@@ -662,7 +1073,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 		swapIcon := widget.NewLabelWithStyle("🢃", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 		maxBttn := widget.NewButton("Max", func() {
 			if tokenInSelect.Selected == "KCAL" {
-				fee := new(big.Int).Mul(dexGasLimit, defaultSettings.GasPrice)
+				fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
 				kcalbal := latestAccountData.FungibleTokens[tokenInSelect.Selected].Amount
 				max := new(big.Int).Sub(&kcalbal, fee)
 				if max.Cmp(big.NewInt(0)) >= 0 {
@@ -684,139 +1095,126 @@ func createDexContent(creds Credentials) *container.Scroll {
 		inTokenSelect := container.NewHBox(widget.NewLabel("From\t"), tokenInSelect)
 		inTokenLyt := container.NewBorder(nil, nil, inTokenSelect, maxBttn, amountEntry)
 
-		amountEntry.OnChanged = func(s string) {
-			if tokenOutSelect.Selected != "" {
-				var userSlippage float64
-				if slippageEntry.Validate() == nil {
+		// amountEntry.OnChanged = func(s string) {
 
-					userSlippage, _ = strconv.ParseFloat(slippageEntry.Text, 64)
-				} else {
-					warningMessageBinding.Set("Check your slippage")
-					return
-				}
-				inAmount, err := convertUserInputToBigInt(amountEntry.Text, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals)
-				if err != nil {
-					return
-				}
-				if selectedPoolData.Reserve1.Symbol == tokenInSelect.Selected {
-					inReserve := selectedPoolData.Reserve1.Amount
-					outReserve := selectedPoolData.Reserve2.Amount
-					impact, estOutAmount, _, err := calculateSwapAndPriceImpact(inAmount, nil, inReserve, outReserve, "swapOut") //(inAmount, inReserve, outReserve)
-					if err != nil {
-						warningMessageBinding.Set(err.Error())
-						inAmountEntryCorrect = false
-						checkSwapBtnState()
-						return
-					}
-					priceImpact = impact
-					if priceImpact > userSlippage {
-						priceImpactIsNotHigh = false
-						warningMessageBinding.Set(fmt.Sprintf("Price impact is too high, current price impact %.2f%%", priceImpact))
-						estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve2.Decimal)
-						outAmountEntry.Text = (estOutAmountStr)
-						outAmountEntry.Refresh()
-						checkSwapBtnState()
-						return
-					} else {
-						priceImpactIsNotHigh = true
-						checkSwapBtnState()
-					}
-					estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve2.Decimal)
-					outAmountEntry.Text = (estOutAmountStr)
-					outAmountEntryCorrect = true
-					checkSwapBtnState()
-					warningMessageBinding.Set(fmt.Sprintf("You can swap from %s to %s with price impact %.2f%%", tokenInSelect.Selected, tokenOutSelect.Selected, impact))
-					outAmountEntry.Validate()
-					outAmountEntry.Refresh()
+		// }
 
-				} else {
-					inReserve := selectedPoolData.Reserve2.Amount
-					outReserve := selectedPoolData.Reserve1.Amount
-					impact, estOutAmount, _, err := calculateSwapAndPriceImpact(inAmount, nil, inReserve, outReserve, "swapOut")
-					if err != nil {
-						warningMessageBinding.Set(err.Error())
-						outAmountEntryCorrect = false
-						checkSwapBtnState()
-						return
-					}
-					priceImpact = impact
-					if priceImpact > userSlippage {
-						priceImpactIsNotHigh = false
-						warningMessageBinding.Set(fmt.Sprintf("Price impact is too high, current price impact %.2f%%", priceImpact))
-						estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve1.Decimal)
-						outAmountEntry.Text = (estOutAmountStr)
-						outAmountEntry.Refresh()
-						checkSwapBtnState()
-						return
-					} else {
-						priceImpactIsNotHigh = true
-						checkSwapBtnState()
-					}
-					estOutAmountStr := formatBalance(*estOutAmount, selectedPoolData.Reserve1.Decimal)
-					outAmountEntry.Text = (estOutAmountStr)
-					outAmountEntryCorrect = true
-					checkSwapBtnState()
-					warningMessageBinding.Set(fmt.Sprintf("You can swap from %s to %s with price impact %.2f%%", tokenInSelect.Selected, tokenOutSelect.Selected, impact))
-					outAmountEntry.Validate()
-					outAmountEntry.Refresh()
-				}
+		// outAmountEntry.Validator = func(s string) error {
 
-			}
-		}
-
-		outAmountEntry.Validator = func(s string) error {
-			tokenData, _ := updateOrCheckCache(tokenOutSelect.Selected, 3, "check")
-			outAmount, err := convertUserInputToBigInt(s, tokenData.Decimals)
+		// }
+		outAmountEntry.OnChanged = func(s string) {
+			fmt.Println("Out amount Changed to ", s)
+			outTokenData, _ := updateOrCheckCache(tokenOutSelect.Selected, 3, "check")
+			outAmount, err := convertUserInputToBigInt(s, outTokenData.Decimals)
 			if err != nil {
 				warningMessageBinding.Set(err.Error())
 				outAmountEntryCorrect = false
 				checkSwapBtnState()
-				return err
+				return
 			}
 			if outAmount.Cmp(big.NewInt(0)) <= 0 {
 				warningMessageBinding.Set("In amount is too small")
 				outAmountEntryCorrect = false
 				checkSwapBtnState()
-				return fmt.Errorf("in amount is too small")
+				return
 			}
+			outAmountEntryCorrect = true
+			if tokenOutSelect.Selected != "" {
 
-			return nil
-
-		}
-		outAmountEntry.OnChanged = func(s string) {
-			tokenData, _ := updateOrCheckCache(tokenOutSelect.Selected, 3, "check")
-			outAmount, _ := convertUserInputToBigInt(s, tokenData.Decimals)
-
-			if tokenOutSelect.Selected == selectedPoolData.Reserve1.Symbol {
-
-				impact, _, estInAmount, err := calculateSwapAndPriceImpact(nil, outAmount, selectedPoolData.Reserve2.Amount, selectedPoolData.Reserve1.Amount, "swapIn") //(inAmount, inReserve, outReserve)
-
+				inAmount, err := reverseCalculateInputAmounts(bestRoute, outAmount, latestDexPools.PoolList)
 				if err != nil {
+					warningMessageBinding.Set(err.Error())
+					outAmountEntryCorrect = false
+					checkSwapBtnState()
+					return
+				}
+
+				inTokenData, _ := updateOrCheckCache(tokenInSelect.Selected, 3, "check")
+				amountEntry.Text = formatBalance(*inAmount, inTokenData.Decimals)
+				amountEntry.Refresh()
+
+				fmt.Println("finding best route for", inAmount, tokenInSelect.Selected, tokenOutSelect.Selected)
+				swapRoutes, err := findAllSwapRoutes(latestDexPools.PoolList, tokenInSelect.Selected, tokenOutSelect.Selected)
+				if err != nil {
+					outAmountEntryCorrect = false
+					checkSwapBtnState()
 					warningMessageBinding.Set(err.Error())
 					return
 				}
-				inAmountStr := formatBalance(*estInAmount, selectedPoolData.Reserve2.Decimal)
-				amountEntry.Text = inAmountStr
-				amountEntry.Refresh()
-				warningMessageBinding.Set(fmt.Sprintf("You can swap from %s to %s with price impact %.2f%%", tokenInSelect.Selected, tokenOutSelect.Selected, impact))
-				outAmountEntryCorrect = true
-				checkSwapBtnState()
-				amountEntry.Validate()
-			} else {
-				impact, _, estInAmount, err := calculateSwapAndPriceImpact(nil, outAmount, selectedPoolData.Reserve1.Amount, selectedPoolData.Reserve2.Amount, "swapIn")
+				foundBestRoute, txData, impact, route, poolCount, _, err := evaluateRoutes(swapRoutes, tokenInSelect.Selected, latestDexPools.PoolList, inAmount, currentDexSlippage, "auto")
+				routeMesssageBinding.Set(route)
+				bestRoute = foundBestRoute
+				dexPayload = "Spallet Swap " + route
+				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), userSettings.DexBaseFeeLimit)
+
+				if tokenInSelect.Selected == "KCAL" {
+					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
+					max := new(big.Int).Add(inAmount, fee)
+					err := checkFeeBalance(max)
+					if err != nil {
+						inAmountEntryCorrect = false
+						checkSwapBtnState()
+						warningMessageBinding.Set("Not enough Kcal")
+						return
+
+					}
+
+				} else {
+					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
+					err := checkFeeBalance(fee)
+					if err != nil {
+						inAmountEntryCorrect = false
+						checkSwapBtnState()
+						warningMessageBinding.Set("Not enough Kcal")
+						return
+
+					}
+
+				}
+				tokenBalance := latestAccountData.FungibleTokens[tokenInSelect.Selected].Amount
+				if inAmount.Cmp(&tokenBalance) > 0 {
+					outAmountEntryCorrect = false
+					checkSwapBtnState()
+					warningMessageBinding.Set("Dont have enough balance")
+					return
+				}
+
+				dexTransaction = txData
 				if err != nil {
+					outAmountEntryCorrect = false
+					checkSwapBtnState()
 					warningMessageBinding.Set(err.Error())
 					return
 				}
-				inAmountStr := formatBalance(*estInAmount, selectedPoolData.Reserve1.Decimal)
-				amountEntry.Text = inAmountStr
-				amountEntry.Refresh()
-				warningMessageBinding.Set(fmt.Sprintf("You can swap from %s to %s with price impact %.2f%%", tokenInSelect.Selected, tokenOutSelect.Selected, impact))
 
-				amountEntry.Validate()
+				priceImpact = impact
+				var userSlippage float64
+
+				userSlippage, err = strconv.ParseFloat(slippageEntry.Text, 64)
+				if err != nil {
+					warningMessageBinding.Set("Check your slippage")
+					return
+
+				}
+
+				if priceImpact > userSlippage {
+					priceImpactIsNotHigh = false
+					warningMessageBinding.Set(fmt.Sprintf("Price impact is too high, current price impact %.2f%%", priceImpact))
+
+					checkSwapBtnState()
+					return
+				} else {
+					priceImpactIsNotHigh = true
+					inAmountEntryCorrect = true
+					checkSwapBtnState()
+				}
+
 				outAmountEntryCorrect = true
 				checkSwapBtnState()
+				warningMessageBinding.Set(fmt.Sprintf("You can swap from %s to %s with price impact %.2f%%", tokenInSelect.Selected, tokenOutSelect.Selected, impact))
+
 			}
+
 		}
 		// outAmountEntry.Disable()
 
@@ -831,6 +1229,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 			outTokenLyt,
 			widget.NewLabel("Slippage Tolerance (%):"),
 			slippageLyt,
+			routeMessage,
 			warningMessage,
 			swapBtn,
 			widget.NewRichTextFromMarkdown("Powered by [Saturn Dex](https://saturn.stellargate.io/)"),
@@ -846,7 +1245,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 
 }
 
-func executeSwap(tokenIn, tokenOut string, amountIn *big.Int, slippageTolerance float64, creds Credentials) error {
+func executeSwap(route []TransactionDataForDex, slippageTolerance float64, creds Credentials, dexGasLimit *big.Int, payload string) error {
 	showUpdatingDialog()
 	defer closeUpdatingDialog()
 
@@ -862,46 +1261,33 @@ func executeSwap(tokenIn, tokenOut string, amountIn *big.Int, slippageTolerance 
 		return fmt.Errorf("invalid wallet key: %v", err)
 	}
 
-	// Format amounts
-	fmt.Printf("Input amount (raw): %s\n", amountIn.String())
-	fmt.Printf("Input amount (formatted): %s\n", formatBalance(*amountIn, latestAccountData.FungibleTokens[tokenIn].Decimals))
-
 	// Convert slippage to basis points (multiply by 100 to get integer)
 	slippageBasisPoints := new(big.Int).SetInt64(int64(slippageTolerance * 100))
 
-	// Debug print script parameters
-	fmt.Printf("\nConstructing SATRN.swap parameters:\n")
-	fmt.Printf("1. from: %s\n", wallet.Address)
-	fmt.Printf("2. amountIn: %s (%s %s)\n", amountIn.String(),
-		formatBalance(*amountIn, latestAccountData.FungibleTokens[tokenIn].Decimals), tokenIn)
-	fmt.Printf("3. tokenIn: %s\n", tokenIn)
-	fmt.Printf("4. tokenOut: %s\n", tokenOut)
-	fmt.Printf("5. slippageTolerance: %d basis points\n", slippageBasisPoints)
-
-	// Check if we have enough balance
-	balance := latestAccountData.FungibleTokens[tokenIn].Amount
-	fmt.Printf("Current balance: %s %s\n",
-		formatBalance(balance, latestAccountData.FungibleTokens[tokenIn].Decimals), tokenIn)
-
-	// Set increased gas limit specifically for swap operations
-
-	fmt.Printf("\nGas settings:\n")
-	fmt.Printf("Price: %s\n", userSettings.GasPrice.String())
-	fmt.Printf("Limit: %s (increased for swap)\n", dexGasLimit.String())
-
-	swapPayload := []byte("Spallet Swap")
-
+	swapPayload := []byte(payload)
 	sb := scriptbuilder.BeginScript()
-	script := sb.AllowGas(wallet.Address, cryptography.NullAddress().String(), userSettings.GasPrice, dexGasLimit).
-		CallContract("SATRN", "swap",
+	sb.AllowGas(wallet.Address, cryptography.NullAddress().String(), userSettings.GasPrice, dexGasLimit)
+
+	for _, tx := range route {
+		// Debug print script parameters
+		fmt.Printf("\nConstructing SATRN.swap parameters for pool %s:\n", tx.Pool)
+		fmt.Printf("1. from: %s\n", wallet.Address)
+		fmt.Printf("2. amountIn: %s (%s)\n", tx.AmountIn.String(), tx.TokenIn)
+		fmt.Printf("3. tokenIn: %s\n", tx.TokenIn)
+		fmt.Printf("4. tokenOut: %s\n", tx.TokenOut)
+		fmt.Printf("5. slippageTolerance: %d basis points\n", slippageBasisPoints)
+
+		sb.CallContract("SATRN", "swap",
 			wallet.Address,      // from
-			amountIn,            // amountIn
-			tokenIn,             // tokenIn
-			tokenOut,            // tokenOut
+			tx.AmountIn,         // amountIn
+			tx.TokenIn,          // tokenIn
+			tx.TokenOut,         // tokenOut
 			slippageBasisPoints, // slippageTolerance
-		).
-		SpendGas(wallet.Address).
-		EndScript()
+		)
+	}
+
+	sb.SpendGas(wallet.Address)
+	script := sb.EndScript()
 
 	fmt.Printf("\nGenerated script hex: %x\n", script)
 
