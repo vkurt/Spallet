@@ -18,7 +18,7 @@ import (
 
 // Function to show Welcome Page
 func showWelcomePage() {
-
+	loadSettings("data/essential/settings.spallet")
 	updateOrCheckCache("", 3, "chain")
 
 	welcomeMsg := widget.NewLabelWithStyle("Welcome to Spallet!", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
