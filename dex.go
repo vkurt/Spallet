@@ -33,10 +33,11 @@ type Pool struct {
 }
 
 type TransactionDataForDex struct {
-	AmountIn *big.Int
-	TokenIn  string
-	TokenOut string
-	Pool     string
+	AmountIn  *big.Int
+	AmountOut *big.Int
+	TokenIn   string
+	TokenOut  string
+	Pool      string
 }
 
 type CachedPoolData struct {
@@ -433,7 +434,7 @@ func evaluateRoutes(routes [][]string, fromToken string, pools []string, inAmoun
 			priceImpact, outAmount, _, _ := calculateSwapAndPriceImpact(currentAmount, nil, poolReserves.Reserve1.Amount, poolReserves.Reserve2.Amount, "swapOut")
 
 			// If outAmount is nil, skip this route
-			if outAmount == nil {
+			if outAmount == nil || outAmount.Cmp(big.NewInt(0)) <= 0 {
 				totalPriceImpact = -1
 				break
 			}
@@ -443,10 +444,11 @@ func evaluateRoutes(routes [][]string, fromToken string, pools []string, inAmoun
 			totalPriceImpact = (1 - priceImpactFactor) * 100
 
 			currentTransactionData = append(currentTransactionData, TransactionDataForDex{
-				AmountIn: new(big.Int).Set(currentAmount),
-				TokenIn:  currentToken,
-				TokenOut: nextToken,
-				Pool:     poolKey,
+				AmountIn:  new(big.Int).Set(currentAmount),
+				AmountOut: new(big.Int).Set(outAmount),
+				TokenIn:   currentToken,
+				TokenOut:  nextToken,
+				Pool:      poolKey,
 			})
 			currentAmount = outAmount
 			currentRouteString = append(currentRouteString, nextToken)
@@ -488,20 +490,22 @@ func evaluateRoutes(routes [][]string, fromToken string, pools []string, inAmoun
 		bestRoute = lowestPriceImpactRoute
 		bestTransactionData = lowestPriceImpactTransactionData
 		bestRouteString = lowestPriceImpactRouteString
-		finalOutAmount = lowestPriceImpactTransactionData[len(lowestPriceImpactTransactionData)-1].AmountIn // Last AmountIn is the final output amount
+		finalOutAmount = lowestPriceImpactTransactionData[len(lowestPriceImpactTransactionData)-1].AmountOut
 
 	case "auto":
 		if highestOutputPriceImpact != -1 && highestOutputPriceImpact <= slippageTolerance {
+			fmt.Println("Auto selected highest output route")
 			bestRoute = highestOutputRoute
 			bestTransactionData = highestOutputTransactionData
 			bestRouteString = highestOutputRouteString
 			finalOutAmount = highestOutputAmount
 			lowestPriceImpact = highestOutputPriceImpact // Store the corresponding price impact
 		} else {
+			fmt.Println("Auto select lowest impact route")
 			bestRoute = lowestPriceImpactRoute
 			bestTransactionData = lowestPriceImpactTransactionData
 			bestRouteString = lowestPriceImpactRouteString
-			finalOutAmount = lowestPriceImpactTransactionData[len(lowestPriceImpactTransactionData)-1].AmountIn // Last AmountIn is the final output amount
+			finalOutAmount = lowestPriceImpactTransactionData[len(lowestPriceImpactTransactionData)-1].AmountOut
 		}
 
 	default:
@@ -541,7 +545,13 @@ func contains(slice []string, item string) bool {
 func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) (*big.Int, error) {
 
 	fmt.Printf("calculating Swap Out\nin amount %v\nin reserves %v\nout reserves %v\n", inAmount, inReserves, outReserves)
+	if inAmount == nil || inReserves == nil || outReserves == nil {
+		return nil, errors.New("cant calculate swap out, nil variables")
+	}
 
+	if inAmount.Cmp(big.NewInt(10000)) < 0 { // saturn dex cant process less than 5 decimals
+		return nil, fmt.Errorf("in amount is too small")
+	}
 	outAmount := big.NewInt(0)
 	// commonDecimal := outReserveDecimal - inReserveDecimal
 	// var normalizedInReserves *big.Int // added this to find a bug but it is unnecessary because it turned out i made a stupid decimal error
@@ -591,6 +601,18 @@ func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) (*big.Int, err
 }
 func calculateSwapIn(outAmount, inReserves, outReserves *big.Int) (*big.Int, error) {
 	// Define constants for fee calculations
+	if outAmount == nil || inReserves == nil || outReserves == nil {
+		return nil, errors.New("cant calculate swap in, nil variables")
+	}
+
+	if outAmount.Cmp(big.NewInt(0)) <= 0 {
+		return nil, errors.New("est out amount is zero")
+	}
+
+	if outAmount.Cmp(outReserves) >= 0 {
+		return nil, errors.New("unsufficient liquidity")
+	}
+
 	const feeNumerator = 997
 	const feeDenominator = 1000
 
@@ -609,9 +631,9 @@ func calculateSwapIn(outAmount, inReserves, outReserves *big.Int) (*big.Int, err
 	inAmount = inAmount.Add(inAmount, big.NewInt(1))
 
 	fmt.Printf("Calculate Swap In Amount: %s\n", inAmount.String())
-	if inAmount.Cmp(big.NewInt(0)) <= 0 {
 
-		return nil, fmt.Errorf("unsufficient liquidity")
+	if inAmount.Cmp(big.NewInt(10000)) < 0 { // saturn dex cant process less than 5 decimals
+		return nil, fmt.Errorf("in amount is too low")
 	}
 
 	return inAmount, nil

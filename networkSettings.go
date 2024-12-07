@@ -83,11 +83,11 @@ func showNetworkSettingsPage(creds Credentials) {
 
 		valid := true
 
-		if !defErr || minErr != nil || maxErr != nil || !priceErr || dexFeeErr {
+		if !defErr || minErr != nil || maxErr != nil || !priceErr || !dexFeeErr || dexBaseGasLimitValue == nil {
 			valid = false
 		}
 
-		if valid && (dexBaseGasLimitValue.Cmp(big.NewInt(25000)) >= 0 || defaultFeeLimitValue.Cmp(big.NewInt(int64(feeLimitSliderMinValue))) < 0 || defaultFeeLimitValue.Cmp(big.NewInt(int64(feeLimitSliderMaxValue))) > 0) {
+		if valid && (dexBaseGasLimitValue.Cmp(big.NewInt(25000)) < 0 || defaultFeeLimitValue.Cmp(big.NewInt(int64(feeLimitSliderMinValue))) < 0 || defaultFeeLimitValue.Cmp(big.NewInt(int64(feeLimitSliderMaxValue))) > 0) {
 			valid = false
 		}
 
