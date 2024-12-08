@@ -49,7 +49,7 @@ var defaultSettings = WalletSettings{
 	RpcType:           "mainnet",
 	NetworkType:       "Mainnet",
 	DexSlippage:       5,
-	DexBaseFeeLimit:   big.NewInt(26000),
+	DexBaseFeeLimit:   big.NewInt(30000),
 }
 
 func saveAddressBook(adrBk addressBook, pwd string) error {

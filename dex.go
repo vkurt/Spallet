@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/phantasma-io/phantasma-go/pkg/blockchain"
 	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
@@ -552,6 +553,10 @@ func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) (*big.Int, err
 	if inAmount.Cmp(big.NewInt(10000)) < 0 { // saturn dex cant process less than 5 decimals
 		return nil, fmt.Errorf("in amount is too small")
 	}
+	pInAmount := new(big.Int).Mul(inAmount, big.NewInt(10)) // doing this for preventing rounding errors
+	pInReserves := new(big.Int).Mul(inReserves, big.NewInt(10))
+	pOutReserves := new(big.Int).Mul(outReserves, big.NewInt(10))
+
 	outAmount := big.NewInt(0)
 	// commonDecimal := outReserveDecimal - inReserveDecimal
 	// var normalizedInReserves *big.Int // added this to find a bug but it is unnecessary because it turned out i made a stupid decimal error
@@ -575,12 +580,12 @@ func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) (*big.Int, err
 
 	// fmt.Printf("-Normalized amounts\nin %v\nin reserve %v\nout reserve %v\n", normalizedInAmount, normalizedInReserves, normalizedOutReserves)
 
-	inAmountMul := new(big.Int).Mul(inAmount, big.NewInt(997))
+	inAmountMul := new(big.Int).Mul(pInAmount, big.NewInt(997))
 	inAmountDiv := new(big.Int).Div(inAmountMul, big.NewInt(1000))
-	inAmountPlusReserves := new(big.Int).Add(inAmountDiv, inReserves)
-	inReservesMulOut := new(big.Int).Mul(inReserves, outReserves)
-	outAmount.Sub(outReserves, new(big.Int).Div(inReservesMulOut, inAmountPlusReserves))
-
+	inAmountPlusReserves := new(big.Int).Add(inAmountDiv, pInReserves)
+	inReservesMulOut := new(big.Int).Mul(pInReserves, pOutReserves)
+	outAmount.Sub(pOutReserves, new(big.Int).Div(inReservesMulOut, inAmountPlusReserves))
+	outAmount.Div(outAmount, big.NewInt(10)) // for returning normal out
 	fmt.Printf("-Calculation variables\ninAmountMul %v\ninAmountDiv %v\ninAmountPlusReserves %v\ninReservesMulOut %v\n", inAmountMul, inAmountDiv, inAmountPlusReserves, inReservesMulOut)
 
 	// // Renormalize the outAmount to the scale of inDecimals
@@ -710,7 +715,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 		loadDexPools()
 
 		slippageBinding := binding.NewString()
-		slippageBinding.Set(fmt.Sprintf("%f", currentDexSlippage)) // Default slippage
+		slippageBinding.Set(fmt.Sprintf("%.2f", currentDexSlippage)) // Default slippage
 		amountEntry := widget.NewEntry()
 		amountEntry.SetPlaceHolder("Amount")
 		amountEntry.Disable()
@@ -785,9 +790,13 @@ func createDexContent(creds Credentials) *container.Scroll {
 				dialog.ShowError(err, mainWindowGui)
 				return
 			}
-
+			routeWarning := ""
+			if len(dexTransaction) > 1 {
+				routeWarning = "⚠️During this swap, Spallet Routing is used.⚠️\n⚠️You might have some leftover tokens from the route pools.⚠️\n\n"
+			}
 			// Confirm swap
-			confirmMessage := fmt.Sprintf("Swap %s %s for estimated %s %s\nPrice Impact %.2f%% (or price increase for %s)\nSlippage: %.1f%%\nGas Fee: %s KCAL",
+			confirmMessage := fmt.Sprintf("%sSwap %s %s for estimated %s %s\nPrice Impact %.2f%% (or price increase for %s)\nSlippage: %.1f%%\nGas Fee: %s KCAL",
+				routeWarning,
 				formatBalance(*amount, token.Decimals),
 				tokenInSelect.Selected,
 				outAmountEntry.Text,
@@ -840,12 +849,14 @@ func createDexContent(creds Credentials) *container.Scroll {
 					return
 				}
 				foundBestRoute, txData, impact, route, poolCount, estOutAmount, err := evaluateRoutes(swapRoutes, tokenInSelect.Selected, latestDexPools.PoolList, inAmount, currentDexSlippage, "auto")
-				routeMesssageBinding.Set(route)
+
 				bestRoute = foundBestRoute
 				dexPayload = "Spallet Swap " + route
+				var routeFee *big.Int
 				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), userSettings.DexBaseFeeLimit)
 				if tokenInSelect.Selected == "KCAL" {
 					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
+					routeFee = fee
 					max := new(big.Int).Add(inAmount, fee)
 					err := checkFeeBalance(max)
 					if err != nil {
@@ -858,6 +869,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 
 				} else {
 					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
+					routeFee = fee
 					err := checkFeeBalance(fee)
 					if err != nil {
 						inAmountEntryCorrect = false
@@ -868,6 +880,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 					}
 
 				}
+				routeMesssageBinding.Set(fmt.Sprintf("%v, required Kcal for this route %s", route, formatBalance(*routeFee, kcalDecimals)))
 				dexTransaction = txData
 				if err != nil {
 					outAmountEntryCorrect = false
@@ -877,6 +890,11 @@ func createDexContent(creds Credentials) *container.Scroll {
 				}
 				outTokendata, _ := updateOrCheckCache(tokenOutSelect.Selected, 3, "check")
 				priceImpact = impact
+				if userSlippage == 99 {
+					priceImpactIsNotHigh = true
+					inAmountEntryCorrect = true
+					checkSwapBtnState()
+				}
 				if priceImpact > userSlippage {
 					priceImpactIsNotHigh = false
 					warningMessageBinding.Set(fmt.Sprintf("Price impact is too high, current price impact %.2f%%", priceImpact))
@@ -939,13 +957,15 @@ func createDexContent(creds Credentials) *container.Scroll {
 					return err
 
 				}
-				routeMesssageBinding.Set(route)
+
+				var routeFee *big.Int
 				bestRoute = foundBestRoute
 				dexPayload = "Spallet Swap " + route
 				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), userSettings.DexBaseFeeLimit)
 
 				if tokenInSelect.Selected == "KCAL" {
 					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
+					routeFee = fee
 					max := new(big.Int).Add(input, fee)
 					err := checkFeeBalance(max)
 					if err != nil {
@@ -958,6 +978,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 
 				} else {
 					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
+					routeFee = fee
 					err := checkFeeBalance(fee)
 					if err != nil {
 						inAmountEntryCorrect = false
@@ -969,11 +990,18 @@ func createDexContent(creds Credentials) *container.Scroll {
 
 				}
 
+				routeMesssageBinding.Set(fmt.Sprintf("%v, required Kcal for this route %s", route, formatBalance(*routeFee, kcalDecimals)))
+
 				dexTransaction = txData
 
 				outTokendata, _ := updateOrCheckCache(tokenOutSelect.Selected, 3, "check")
 				priceImpact = impact
-				if priceImpact > userSlippage {
+
+				if userSlippage == 99 {
+					priceImpactIsNotHigh = true
+					inAmountEntryCorrect = true
+					checkSwapBtnState()
+				} else if priceImpact > userSlippage {
 					priceImpactIsNotHigh = false
 					warningMessageBinding.Set(fmt.Sprintf("Price impact is too high, current price impact %.2f%%", priceImpact))
 					estOutAmountStr := formatBalance(*estOutAmount, outTokendata.Decimals)
@@ -1042,6 +1070,17 @@ func createDexContent(creds Credentials) *container.Scroll {
 		})
 		slippageSaveBtn.Disable()
 		slippageEntry.Validator = func(s string) error {
+			// Split the input string at the decimal point
+			parts := strings.Split(s, ".")
+			// Check if there are more than 2 decimals
+			if len(parts) > 1 && len(parts[1]) > 2 {
+				slippageEntryCorrect = false
+				slippageSaveBtn.Disable()
+				slippageSaveBtn.Refresh()
+				checkSwapBtnState()
+				return fmt.Errorf("invalid slippage (must not have more than 2 decimal places)")
+			}
+
 			slippage, err := strconv.ParseFloat(s, 64)
 
 			if err != nil {
@@ -1050,18 +1089,18 @@ func createDexContent(creds Credentials) *container.Scroll {
 				slippageSaveBtn.Refresh()
 				checkSwapBtnState()
 				return err
-			} else if slippage <= 0 {
+			} else if slippage < 0 {
 				slippageEntryCorrect = false
 				slippageSaveBtn.Disable()
 				slippageSaveBtn.Refresh()
 				checkSwapBtnState()
-				return fmt.Errorf("invalid slippage (must be greater than 0 )")
-			} else if slippage > 100 {
+				return fmt.Errorf("invalid slippage (min 0)")
+			} else if slippage > 99 {
 				slippageEntryCorrect = false
 				slippageSaveBtn.Disable()
 				slippageSaveBtn.Refresh()
 				checkSwapBtnState()
-				return fmt.Errorf("invalid slippage (must be less than 100 )")
+				return fmt.Errorf("invalid slippage (max 99)")
 			} else {
 				slippageEntryCorrect = true
 
@@ -1076,7 +1115,11 @@ func createDexContent(creds Credentials) *container.Scroll {
 
 				}
 				fmt.Printf("price impact %v,current slippage %v, swapbutton state %v\n ", priceImpact, currentDexSlippage, swapBtn.Disabled())
-				if priceImpact < currentDexSlippage && swapBtn.Disabled() { //for enabling swap button after user changes slippage
+				if currentDexSlippage == 99 && swapBtn.Disabled() { // aka Yolo mode on
+					amountEntry.Validate()
+					outAmountEntry.Validate()
+					priceImpactIsNotHigh = true
+				} else if priceImpact < currentDexSlippage && swapBtn.Disabled() { //for enabling swap button after user changes slippage
 					amountEntry.Validate()
 					outAmountEntry.Validate()
 					priceImpactIsNotHigh = true
@@ -1164,13 +1207,15 @@ func createDexContent(creds Credentials) *container.Scroll {
 					return
 				}
 				foundBestRoute, txData, impact, route, poolCount, _, err := evaluateRoutes(swapRoutes, tokenInSelect.Selected, latestDexPools.PoolList, inAmount, currentDexSlippage, "auto")
-				routeMesssageBinding.Set(route)
+
+				var routeFee *big.Int
 				bestRoute = foundBestRoute
 				dexPayload = "Spallet Swap " + route
 				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), userSettings.DexBaseFeeLimit)
 
 				if tokenInSelect.Selected == "KCAL" {
 					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
+					routeFee = fee
 					max := new(big.Int).Add(inAmount, fee)
 					err := checkFeeBalance(max)
 					if err != nil {
@@ -1183,6 +1228,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 
 				} else {
 					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
+					routeFee = fee
 					err := checkFeeBalance(fee)
 					if err != nil {
 						inAmountEntryCorrect = false
@@ -1193,6 +1239,9 @@ func createDexContent(creds Credentials) *container.Scroll {
 					}
 
 				}
+
+				routeMesssageBinding.Set(fmt.Sprintf("%v, required Kcal for this route %s", route, formatBalance(*routeFee, kcalDecimals)))
+
 				tokenBalance := latestAccountData.FungibleTokens[tokenInSelect.Selected].Amount
 				if inAmount.Cmp(&tokenBalance) > 0 {
 					outAmountEntryCorrect = false
@@ -1219,7 +1268,11 @@ func createDexContent(creds Credentials) *container.Scroll {
 
 				}
 
-				if priceImpact > userSlippage {
+				if userSlippage == 99 {
+					priceImpactIsNotHigh = true
+					inAmountEntryCorrect = true
+					checkSwapBtnState()
+				} else if priceImpact > userSlippage {
 					priceImpactIsNotHigh = false
 					warningMessageBinding.Set(fmt.Sprintf("Price impact is too high, current price impact %.2f%%", priceImpact))
 
@@ -1284,7 +1337,7 @@ func executeSwap(route []TransactionDataForDex, slippageTolerance float64, creds
 	}
 
 	// Convert slippage to basis points (multiply by 100 to get integer)
-	slippageBasisPoints := new(big.Int).SetInt64(int64(slippageTolerance * 100))
+	slippageBasisPoints := new(big.Int).SetInt64(int64(slippageTolerance))
 
 	swapPayload := []byte(payload)
 	sb := scriptbuilder.BeginScript()
@@ -1330,26 +1383,45 @@ func executeSwap(route []TransactionDataForDex, slippageTolerance float64, creds
 	}
 
 	fmt.Printf("Transaction sent with hash: %s\n", txHash)
-	go monitorSwapTransaction(txHash)
+	go monitorSwapTransaction(txHash, creds)
 
 	return nil
 }
 
-func monitorSwapTransaction(txHash string) {
+func monitorSwapTransaction(txHash string, creds Credentials) {
 	maxRetries := 30
 	retryCount := 0
 	retryDelay := time.Millisecond * 500
 
 	fmt.Printf("Starting transaction monitoring for hash: %s\n", txHash)
+	var dexTxDia dialog.Dialog
+	resultDiaMessage := widget.NewLabel("")
+	resultDiaMessage.Wrapping = fyne.TextWrapWord
+	explorerBtn := widget.NewButton("Show on explorer", func() {
+		explorerURL := fmt.Sprintf("%s%s", userSettings.TxExplorerLink, txHash)
+		if parsedURL, err := url.Parse(explorerURL); err == nil {
+			fyne.CurrentApp().OpenURL(parsedURL)
+		}
 
+	})
+	closeBtn := widget.NewButtonWithIcon("", theme.WindowCloseIcon(), func() {
+		dexTxDia.Hide()
+	})
 	for {
 		if retryCount >= maxRetries {
 			fmt.Printf("Transaction monitoring timed out after %d retries\n", maxRetries)
-			dialog.ShowError(fmt.Errorf("transaction monitoring timed out. Transaction hash: %s\nPlease check the explorer manually", txHash), mainWindowGui)
-			explorerURL := fmt.Sprintf("%s%s", userSettings.TxExplorerLink, txHash)
-			if parsedURL, err := url.Parse(explorerURL); err == nil {
-				fyne.CurrentApp().OpenURL(parsedURL)
-			}
+
+			messageHeader := widget.NewLabelWithStyle("Transaction monitoring timed out.", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+			resultDiaMessage.Text = fmt.Sprintf("Tx hash: %s\nPlease check the explorer manually", txHash[:30]+"...")
+			content := container.NewVBox(resultDiaMessage)
+			btns := container.NewVBox(explorerBtn, closeBtn)
+			lyt := container.NewBorder(messageHeader, btns, nil, nil, content)
+			dexTxDia = dialog.NewCustomWithoutButtons("Transaction Result", lyt, mainWindowGui)
+			dexTxDia.Resize(fyne.NewSize(400, 225))
+			dataFetch(creds)
+			createDexContent(creds)
+			dexTab.Refresh()
+			dexTxDia.Show()
 			return
 		}
 
@@ -1364,18 +1436,53 @@ func monitorSwapTransaction(txHash string) {
 				continue
 			}
 
-			dialog.ShowError(fmt.Errorf("failed to get transaction status: %v", err), mainWindowGui)
+			messageHeader := widget.NewLabelWithStyle("Failed to get transaction status.", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+			resultDiaMessage.Text = fmt.Sprintf("Tx hash: %s\nPlease check the explorer manually\nErr: %v", txHash[:30]+"...", err)
+			content := container.NewVBox(resultDiaMessage)
+			btns := container.NewVBox(explorerBtn, closeBtn)
+			lyt := container.NewBorder(messageHeader, btns, nil, nil, content)
+			dexTxDia = dialog.NewCustomWithoutButtons("Transaction Result", lyt, mainWindowGui)
+			dexTxDia.Resize(fyne.NewSize(400, 225))
+			dataFetch(creds)
+			createDexContent(creds)
+			dexTab.Refresh()
+			dexTxDia.Show()
 			return
 		}
 
 		if txResult.StateIsSuccess() {
 			fmt.Printf("Transaction successful\n")
-			dialog.ShowInformation("Success", fmt.Sprintf("Swap completed successfully\nTransaction: %s", txHash), mainWindowGui)
+			messageHeader := widget.NewLabelWithStyle("Swap completed successfully", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+			fee, _ := new(big.Int).SetString(txResult.Fee, 10)
+			feeStr := formatBalance(*fee, kcalDecimals)
+			resultDiaMessage.Text = fmt.Sprintf("Tx hash:\t%s\nFee:\t\t%s", txHash[:30]+"...", feeStr)
+			content := container.NewVBox(resultDiaMessage)
+			btns := container.NewVBox(explorerBtn, closeBtn)
+			lyt := container.NewBorder(messageHeader, btns, nil, nil, content)
+			dexTxDia = dialog.NewCustomWithoutButtons("Transaction Result", lyt, mainWindowGui)
+			dexTxDia.Resize(fyne.NewSize(400, 225))
+			dataFetch(creds)
+			createDexContent(creds)
+			dexTab.Refresh()
+			dexTxDia.Show()
+
 			return
 		}
 		if txResult.StateIsFault() {
 			fmt.Printf("Transaction failed\n")
-			dialog.ShowError(fmt.Errorf("swap failed\nTransaction: %s", txHash), mainWindowGui)
+
+			messageHeader := widget.NewLabelWithStyle("Swap failed", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+			resultDiaMessage.Text = fmt.Sprintf("Tx hash: %s", txHash[:30]+"...")
+			content := container.NewVBox(resultDiaMessage)
+			btns := container.NewVBox(explorerBtn, closeBtn)
+			lyt := container.NewBorder(messageHeader, btns, nil, nil, content)
+			dexTxDia = dialog.NewCustomWithoutButtons("Transaction Result", lyt, mainWindowGui)
+			dexTxDia.Resize(fyne.NewSize(400, 225))
+			dataFetch(creds)
+			createDexContent(creds)
+			dexTab.Refresh()
+			dexTxDia.Show()
+
 			return
 		}
 
