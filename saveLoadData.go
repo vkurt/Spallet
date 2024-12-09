@@ -13,43 +13,47 @@ import (
 )
 
 type WalletSettings struct {
-	AskPwd            bool     `json:"ask_pwd"` // security settings
-	LgnTmeOut         int      `json:"lgn_tmeout"`
-	SendOnly          bool     `json:"send_only"`
-	NetworkName       string   `json:"network"` //  network settings
-	ChainName         string   `json:"chain"`
-	DefaultGasLimit   *big.Int `json:"default_gas_limit"`
-	GasLimitSliderMax float64  `json:"gas_limit_slider_max"`
-	GasLimitSliderMin float64  `json:"gas_limit_slider_min"`
-	GasPrice          *big.Int `json:"gas_price"`
-	TxExplorerLink    string   `json:"tx_explorer_link"`
-	AccExplorerLink   string   `json:"acc_explorer_link"`
-	RpcType           string   `json:"rpc_type"` //tried rpc.PhantasmaRpc but not worked
-	CustomRpcLink     string   `json:"custom_rpc_link"`
-	NetworkType       string   `json:"network_type"`
-	DexSlippage       float64  `json:"dex_slippage"`
-	DexBaseFeeLimit   *big.Int `json:"dex_base_fee_limit"`
+	AskPwd             bool     `json:"ask_pwd"` // security settings
+	LgnTmeOut          int      `json:"lgn_tmeout"`
+	SendOnly           bool     `json:"send_only"`
+	NetworkName        string   `json:"network"` //  network settings
+	ChainName          string   `json:"chain"`
+	DefaultGasLimit    *big.Int `json:"default_gas_limit"`
+	GasLimitSliderMax  float64  `json:"gas_limit_slider_max"`
+	GasLimitSliderMin  float64  `json:"gas_limit_slider_min"`
+	GasPrice           *big.Int `json:"gas_price"`
+	TxExplorerLink     string   `json:"tx_explorer_link"`
+	AccExplorerLink    string   `json:"acc_explorer_link"`
+	RpcType            string   `json:"rpc_type"` //tried rpc.PhantasmaRpc but not worked
+	CustomRpcLink      string   `json:"custom_rpc_link"`
+	NetworkType        string   `json:"network_type"`
+	DexSlippage        float64  `json:"dex_slippage"` // Dex settings
+	DexBaseFeeLimit    *big.Int `json:"dex_base_fee_limit"`
+	DexRouteEvaluation string   `json:"dex_route_evaluation"`
+	DexDirectRoute     bool     `json:"dex_direct_route"`
 }
 
 var client rpc.PhantasmaRPC
 var userSettings WalletSettings
 
 var defaultSettings = WalletSettings{
-	AskPwd:            true, //default security settings
-	LgnTmeOut:         15,
-	SendOnly:          false,
-	NetworkName:       "mainnet", // default network settings
-	ChainName:         "main",
-	DefaultGasLimit:   big.NewInt(10000),
-	GasLimitSliderMax: 100000,
-	GasLimitSliderMin: 10000,
-	GasPrice:          big.NewInt(100000),
-	TxExplorerLink:    "https://explorer.phantasma.info/en/transaction?id=",
-	AccExplorerLink:   "https://explorer.phantasma.info/en/address?id=",
-	RpcType:           "mainnet",
-	NetworkType:       "Mainnet",
-	DexSlippage:       5,
-	DexBaseFeeLimit:   big.NewInt(30000),
+	AskPwd:             true, //default security settings
+	LgnTmeOut:          15,
+	SendOnly:           false,
+	NetworkName:        "mainnet", // default network settings
+	ChainName:          "main",
+	DefaultGasLimit:    big.NewInt(10000),
+	GasLimitSliderMax:  100000,
+	GasLimitSliderMin:  10000,
+	GasPrice:           big.NewInt(100000),
+	TxExplorerLink:     "https://explorer.phantasma.info/en/transaction?id=",
+	AccExplorerLink:    "https://explorer.phantasma.info/en/address?id=",
+	RpcType:            "mainnet",
+	NetworkType:        "Mainnet",
+	DexSlippage:        5,
+	DexBaseFeeLimit:    big.NewInt(30000),
+	DexRouteEvaluation: "auto",
+	DexDirectRoute:     false,
 }
 
 func saveAddressBook(adrBk addressBook, pwd string) error {

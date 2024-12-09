@@ -260,9 +260,10 @@ func getPoolReserves(pool string) Pool {
  * @param pools           List of pool pairs in the format "TOKEN1_TOKEN2".
  * @param fromToken       The starting token for the swap.
  * @param toToken         The destination token for the swap.
+ * @param directRoutesOnly Boolean flag indicating whether to find only direct routes.
  * @return allRoutes      All possible routes as a list of lists of pools.
  */
-func findAllSwapRoutes(pools []string, fromToken, toToken string) ([][]string, error) {
+func findAllSwapRoutes(pools []string, fromToken, toToken string, directRoutesOnly bool) ([][]string, error) {
 	var allRoutes [][]string
 
 	// Build a map of pools to easily find connections between tokens
@@ -279,6 +280,11 @@ func findAllSwapRoutes(pools []string, fromToken, toToken string) ([][]string, e
 		// Base case: If we reach the destination token, add the current route to allRoutes
 		if currentToken == toToken {
 			allRoutes = append(allRoutes, append([]string(nil), currentRoute...))
+			return
+		}
+
+		// If directRoutesOnly is true, stop searching further
+		if directRoutesOnly && len(currentRoute) > 0 {
 			return
 		}
 
@@ -402,10 +408,11 @@ func evaluateRoutes(routes [][]string, fromToken string, pools []string, inAmoun
 	var highestOutputAmount *big.Int                             // Stores the final output amount for the highest output route
 	var bestRouteString string
 	var bestTransactionData []TransactionDataForDex
+	var routeErrors []error // Holds errors for routes
 	fmt.Println("*****evaluating routes******")
 
 	// Function to get correct pool reserves by considering the order of tokens
-	getCorrectPoolReserves := func(token1, token2 string) (string, Pool) {
+	getCorrectPoolReserves := func(token1, token2 string) (string, Pool, error) {
 		poolKey := token1 + "_" + token2
 		reverseKey := token2 + "_" + token1
 		pool := Pool{}
@@ -415,8 +422,10 @@ func evaluateRoutes(routes [][]string, fromToken string, pools []string, inAmoun
 			pool = getPoolReserves(reverseKey)
 			pool.Reserve1, pool.Reserve2 = pool.Reserve2, pool.Reserve1 // Swap reserves
 			poolKey = reverseKey
+		} else {
+			return "", Pool{}, fmt.Errorf("pool not found for tokens: %s, %s", token1, token2)
 		}
-		return poolKey, pool
+		return poolKey, pool, nil
 	}
 
 	// Iterate through all routes to find the lowest price impact route and highest output route
@@ -426,17 +435,26 @@ func evaluateRoutes(routes [][]string, fromToken string, pools []string, inAmoun
 		var currentRouteString []string = []string{fromToken}
 		var totalPriceImpact float64 = 0
 		var priceImpactFactor float64 = 1.0
+		var routeError error
 
 		for _, pool := range route {
 			tokens := strings.Split(pool, "_")
 			currentToken, nextToken := tokens[0], tokens[1]
 			fmt.Println("trying to get correct pools for", currentToken, nextToken)
-			poolKey, poolReserves := getCorrectPoolReserves(currentToken, nextToken)
-			priceImpact, outAmount, _, _ := calculateSwapAndPriceImpact(currentAmount, nil, poolReserves.Reserve1.Amount, poolReserves.Reserve2.Amount, "swapOut")
+			poolKey, poolReserves, err := getCorrectPoolReserves(currentToken, nextToken)
+			if err != nil {
+				routeError = err
+				break
+			}
+			priceImpact, outAmount, _, err := calculateSwapAndPriceImpact(currentAmount, nil, poolReserves.Reserve1.Amount, poolReserves.Reserve2.Amount, "swapOut")
+			if err != nil {
+				routeError = err
+				break
+			}
 
-			// If outAmount is nil, skip this route
+			// If outAmount is nil or zero, skip this route
 			if outAmount == nil || outAmount.Cmp(big.NewInt(0)) <= 0 {
-				totalPriceImpact = -1
+				routeError = fmt.Errorf("invalid output amount for pool: %s", poolKey)
 				break
 			}
 
@@ -455,6 +473,11 @@ func evaluateRoutes(routes [][]string, fromToken string, pools []string, inAmoun
 			currentRouteString = append(currentRouteString, nextToken)
 		}
 
+		// If route encountered an error, store it and skip further processing
+		if routeError != nil {
+			routeErrors = append(routeErrors, routeError)
+			continue
+		}
 		// Compare routes to find the lowest price impact route
 		if totalPriceImpact != -1 && (lowestPriceImpact == -1 || totalPriceImpact < lowestPriceImpact) {
 			lowestPriceImpact = totalPriceImpact
@@ -475,6 +498,9 @@ func evaluateRoutes(routes [][]string, fromToken string, pools []string, inAmoun
 
 	// Check if a valid route was found
 	if len(highestOutputRoute) == 0 || len(lowestPriceImpactRoute) == 0 {
+		if len(routeErrors) > 0 {
+			return nil, nil, 0, "", 0, nil, fmt.Errorf("no valid route found, errors: %v", routeErrors)
+		}
 		return nil, nil, 0, "", 0, nil, errors.New("no valid route found")
 	}
 
@@ -502,7 +528,7 @@ func evaluateRoutes(routes [][]string, fromToken string, pools []string, inAmoun
 			finalOutAmount = highestOutputAmount
 			lowestPriceImpact = highestOutputPriceImpact // Store the corresponding price impact
 		} else {
-			fmt.Println("Auto select lowest impact route")
+			fmt.Println("Auto selected lowest impact route")
 			bestRoute = lowestPriceImpactRoute
 			bestTransactionData = lowestPriceImpactTransactionData
 			bestRouteString = lowestPriceImpactRouteString
@@ -697,7 +723,8 @@ func calculateSwapAndPriceImpact(inAmount, outAmount, inReserves, outReserves *b
 }
 
 func createDexContent(creds Credentials) *container.Scroll {
-	currentDexFeeLimit, _ := new(big.Int).SetString(userSettings.DexBaseFeeLimit.String(), 10)
+	currentDexBaseFeeLimit := new(big.Int).Set(userSettings.DexBaseFeeLimit)
+	currentDexFeeLimit := new(big.Int).Set(currentDexBaseFeeLimit)
 	fee := new(big.Int).Mul(currentDexFeeLimit, userSettings.GasPrice)
 	err := checkFeeBalance(fee)
 	var priceImpact float64
@@ -706,11 +733,12 @@ func createDexContent(creds Credentials) *container.Scroll {
 	var outTokenSelected bool
 	var inAmountEntryCorrect bool
 	var outAmountEntryCorrect bool
-	var slippageEntryCorrect bool
 	var priceImpactIsNotHigh bool
 	var dexTransaction []TransactionDataForDex
 	var dexPayload string
 	var bestRoute []string
+	var currentDexRouteEvaluation = userSettings.DexRouteEvaluation
+	var currentOnlyDirectRoute = userSettings.DexDirectRoute
 	if err == nil {
 		loadDexPools()
 
@@ -751,9 +779,6 @@ func createDexContent(creds Credentials) *container.Scroll {
 			outAmountEntry.Disable()
 			tokenOutSelect.Disable()
 		}
-
-		slippageEntry := widget.NewEntryWithData(slippageBinding)
-		slippageEntry.SetPlaceHolder("Slippage Tolerance %")
 
 		swapBtn := widget.NewButton("Swap Tokens", func() {
 			if tokenInSelect.Selected == "" || tokenOutSelect.Selected == "" {
@@ -817,8 +842,8 @@ func createDexContent(creds Credentials) *container.Scroll {
 		})
 		swapBtn.Disable()
 		checkSwapBtnState := func() {
-			fmt.Println("Swap button State", inTokenSelected, outTokenSelected, inAmountEntryCorrect, outAmountEntryCorrect, slippageEntryCorrect, priceImpactIsNotHigh)
-			if inTokenSelected && outTokenSelected && inAmountEntryCorrect && outAmountEntryCorrect && slippageEntryCorrect && priceImpactIsNotHigh {
+			fmt.Println("Swap button State", inTokenSelected, outTokenSelected, inAmountEntryCorrect, outAmountEntryCorrect, priceImpactIsNotHigh)
+			if inTokenSelected && outTokenSelected && inAmountEntryCorrect && outAmountEntryCorrect && priceImpactIsNotHigh {
 				swapBtn.Enable()
 			} else {
 				swapBtn.Disable()
@@ -828,32 +853,29 @@ func createDexContent(creds Credentials) *container.Scroll {
 		tokenOutSelect.OnChanged = func(s string) {
 
 			if s != "" {
-				var userSlippage float64
-				if slippageEntry.Validate() == nil {
-					userSlippage, _ = strconv.ParseFloat(slippageEntry.Text, 64)
-				} else {
-					warningMessageBinding.Set("Check your slippage")
-					return
-				}
+
+				slippageStr, _ := slippageBinding.Get()
+				userSlippage, _ := strconv.ParseFloat(slippageStr, 64)
 
 				outTokenSelected = true
 				checkSwapBtnState()
 				outAmountEntry.Enable()
 				inAmount, _ := convertUserInputToBigInt(amountEntry.Text, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals)
 				fmt.Println("finding best route for", inAmount.String(), tokenInSelect.Selected, tokenOutSelect.Selected)
-				swapRoutes, err := findAllSwapRoutes(latestDexPools.PoolList, tokenInSelect.Selected, tokenOutSelect.Selected)
+				swapRoutes, err := findAllSwapRoutes(latestDexPools.PoolList, tokenInSelect.Selected, tokenOutSelect.Selected, currentOnlyDirectRoute)
 				if err != nil {
 					outAmountEntryCorrect = false
 					checkSwapBtnState()
 					warningMessageBinding.Set(err.Error())
+					routeMesssageBinding.Set("")
 					return
 				}
-				foundBestRoute, txData, impact, route, poolCount, estOutAmount, err := evaluateRoutes(swapRoutes, tokenInSelect.Selected, latestDexPools.PoolList, inAmount, currentDexSlippage, "auto")
+				foundBestRoute, txData, impact, route, poolCount, estOutAmount, err := evaluateRoutes(swapRoutes, tokenInSelect.Selected, latestDexPools.PoolList, inAmount, currentDexSlippage, currentDexRouteEvaluation)
 
 				bestRoute = foundBestRoute
 				dexPayload = "Spallet Swap " + route
 				var routeFee *big.Int
-				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), userSettings.DexBaseFeeLimit)
+				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), currentDexBaseFeeLimit)
 				if tokenInSelect.Selected == "KCAL" {
 					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
 					routeFee = fee
@@ -928,28 +950,23 @@ func createDexContent(creds Credentials) *container.Scroll {
 			}
 
 			if tokenOutSelect.Selected != "" {
-				var userSlippage float64
-
-				userSlippage, err = strconv.ParseFloat(slippageEntry.Text, 64)
-				if err != nil {
-					warningMessageBinding.Set("Check your slippage")
-					return fmt.Errorf("check your slippage")
-
-				}
+				slippageStr, _ := slippageBinding.Get()
+				userSlippage, _ := strconv.ParseFloat(slippageStr, 64)
 
 				outTokenSelected = true
 				checkSwapBtnState()
 				outAmountEntry.Enable()
 				// inAmount, _ := convertUserInputToBigInt(amountEntry.Text, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals)
 				fmt.Println("finding best route for", input, tokenInSelect.Selected, tokenOutSelect.Selected)
-				swapRoutes, err := findAllSwapRoutes(latestDexPools.PoolList, tokenInSelect.Selected, tokenOutSelect.Selected)
+				swapRoutes, err := findAllSwapRoutes(latestDexPools.PoolList, tokenInSelect.Selected, tokenOutSelect.Selected, currentOnlyDirectRoute)
 				if err != nil {
 					outAmountEntryCorrect = false
 					checkSwapBtnState()
 					warningMessageBinding.Set(err.Error())
+					routeMesssageBinding.Set("")
 					return err
 				}
-				foundBestRoute, txData, impact, route, poolCount, estOutAmount, err := evaluateRoutes(swapRoutes, tokenInSelect.Selected, latestDexPools.PoolList, input, currentDexSlippage, "auto")
+				foundBestRoute, txData, impact, route, poolCount, estOutAmount, err := evaluateRoutes(swapRoutes, tokenInSelect.Selected, latestDexPools.PoolList, input, currentDexSlippage, currentDexRouteEvaluation)
 				if err != nil {
 					outAmountEntryCorrect = false
 					checkSwapBtnState()
@@ -961,7 +978,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 				var routeFee *big.Int
 				bestRoute = foundBestRoute
 				dexPayload = "Spallet Swap " + route
-				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), userSettings.DexBaseFeeLimit)
+				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), currentDexBaseFeeLimit)
 
 				if tokenInSelect.Selected == "KCAL" {
 					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
@@ -1053,88 +1070,23 @@ func createDexContent(creds Credentials) *container.Scroll {
 			}
 		}
 
-		slippageSaveBtn := widget.NewButton("Save as default", func() {
-			if slippageEntry.Validate() == nil {
-				slippage, _ := strconv.ParseFloat(slippageEntry.Text, 64)
-				userSettings.DexSlippage = slippage
-				err := saveSettings()
-				if err == nil {
+		// slippageSaveBtn := widget.NewButton("Save as default", func() {
+		// 	if slippageEntry.Validate() == nil {
+		// 		slippage, _ := strconv.ParseFloat(slippageEntry.Text, 64)
+		// 		userSettings.DexSlippage = slippage
+		// 		err := saveSettings()
+		// 		if err == nil {
 
-					dialog.ShowInformation("Saved successfully", fmt.Sprintf("Your default slippage is set to %.2f%%", slippage), mainWindowGui)
-					slippageEntry.Validate()
-				} else {
-					dialog.ShowError(err, mainWindowGui)
-				}
+		// 			dialog.ShowInformation("Saved successfully", fmt.Sprintf("Your default slippage is set to %.2f%%", slippage), mainWindowGui)
+		// 			slippageEntry.Validate()
+		// 		} else {
+		// 			dialog.ShowError(err, mainWindowGui)
+		// 		}
 
-			}
-		})
-		slippageSaveBtn.Disable()
-		slippageEntry.Validator = func(s string) error {
-			// Split the input string at the decimal point
-			parts := strings.Split(s, ".")
-			// Check if there are more than 2 decimals
-			if len(parts) > 1 && len(parts[1]) > 2 {
-				slippageEntryCorrect = false
-				slippageSaveBtn.Disable()
-				slippageSaveBtn.Refresh()
-				checkSwapBtnState()
-				return fmt.Errorf("invalid slippage (must not have more than 2 decimal places)")
-			}
+		// 	}
+		// })
+		// slippageSaveBtn.Disable()
 
-			slippage, err := strconv.ParseFloat(s, 64)
-
-			if err != nil {
-				slippageEntryCorrect = false
-				slippageSaveBtn.Disable()
-				slippageSaveBtn.Refresh()
-				checkSwapBtnState()
-				return err
-			} else if slippage < 0 {
-				slippageEntryCorrect = false
-				slippageSaveBtn.Disable()
-				slippageSaveBtn.Refresh()
-				checkSwapBtnState()
-				return fmt.Errorf("invalid slippage (min 0)")
-			} else if slippage > 99 {
-				slippageEntryCorrect = false
-				slippageSaveBtn.Disable()
-				slippageSaveBtn.Refresh()
-				checkSwapBtnState()
-				return fmt.Errorf("invalid slippage (max 99)")
-			} else {
-				slippageEntryCorrect = true
-
-				if userSettings.DexSlippage != slippage {
-					currentDexSlippage = slippage
-					fmt.Println("Slipage save btn enabled")
-					slippageSaveBtn.Enable()
-
-				} else {
-					fmt.Println("Slipage save btn disabled")
-					slippageSaveBtn.Disable()
-
-				}
-				fmt.Printf("price impact %v,current slippage %v, swapbutton state %v\n ", priceImpact, currentDexSlippage, swapBtn.Disabled())
-				if currentDexSlippage == 99 && swapBtn.Disabled() { // aka Yolo mode on
-					amountEntry.Validate()
-					outAmountEntry.Validate()
-					priceImpactIsNotHigh = true
-				} else if priceImpact < currentDexSlippage && swapBtn.Disabled() { //for enabling swap button after user changes slippage
-					amountEntry.Validate()
-					outAmountEntry.Validate()
-					priceImpactIsNotHigh = true
-
-				} else if priceImpact > currentDexSlippage && !swapBtn.Disabled() {
-					amountEntry.Validate()
-					outAmountEntry.Validate()
-					priceImpactIsNotHigh = false
-				}
-				slippageSaveBtn.Refresh()
-				checkSwapBtnState()
-				return nil
-			}
-
-		}
 		swapIcon := widget.NewLabelWithStyle("🢃", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 		maxBttn := widget.NewButton("Max", func() {
 			if tokenInSelect.Selected == "KCAL" {
@@ -1199,19 +1151,20 @@ func createDexContent(creds Credentials) *container.Scroll {
 				amountEntry.Refresh()
 
 				fmt.Println("finding best route for", inAmount, tokenInSelect.Selected, tokenOutSelect.Selected)
-				swapRoutes, err := findAllSwapRoutes(latestDexPools.PoolList, tokenInSelect.Selected, tokenOutSelect.Selected)
+				swapRoutes, err := findAllSwapRoutes(latestDexPools.PoolList, tokenInSelect.Selected, tokenOutSelect.Selected, currentOnlyDirectRoute)
 				if err != nil {
 					outAmountEntryCorrect = false
 					checkSwapBtnState()
 					warningMessageBinding.Set(err.Error())
+					routeMesssageBinding.Set("")
 					return
 				}
-				foundBestRoute, txData, impact, route, poolCount, _, err := evaluateRoutes(swapRoutes, tokenInSelect.Selected, latestDexPools.PoolList, inAmount, currentDexSlippage, "auto")
+				foundBestRoute, txData, impact, route, poolCount, _, err := evaluateRoutes(swapRoutes, tokenInSelect.Selected, latestDexPools.PoolList, inAmount, currentDexSlippage, currentDexRouteEvaluation)
 
 				var routeFee *big.Int
 				bestRoute = foundBestRoute
 				dexPayload = "Spallet Swap " + route
-				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), userSettings.DexBaseFeeLimit)
+				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), currentDexBaseFeeLimit)
 
 				if tokenInSelect.Selected == "KCAL" {
 					fee := new(big.Int).Mul(currentDexFeeLimit, defaultSettings.GasPrice)
@@ -1259,14 +1212,8 @@ func createDexContent(creds Credentials) *container.Scroll {
 				}
 
 				priceImpact = impact
-				var userSlippage float64
-
-				userSlippage, err = strconv.ParseFloat(slippageEntry.Text, 64)
-				if err != nil {
-					warningMessageBinding.Set("Check your slippage")
-					return
-
-				}
+				slippageStr, _ := slippageBinding.Get()
+				userSlippage, _ := strconv.ParseFloat(slippageStr, 64)
 
 				if userSlippage == 99 {
 					priceImpactIsNotHigh = true
@@ -1293,21 +1240,195 @@ func createDexContent(creds Credentials) *container.Scroll {
 		}
 		// outAmountEntry.Disable()
 
-		slippageLyt := container.NewBorder(nil, nil, nil, slippageSaveBtn, slippageEntry)
+		// slippageLyt := container.NewBorder(nil, nil, nil, slippageSaveBtn, slippageEntry)
 		outAmountEntry.SetPlaceHolder("Estimated out amount")
 		outTokenSelect := container.NewHBox(widget.NewLabel("To\t"), tokenOutSelect)
 		outTokenLyt := container.NewBorder(nil, nil, outTokenSelect, nil, outAmountEntry)
+		settingsBtn := widget.NewButtonWithIcon("", theme.SettingsIcon(), func() {
+			var settingsDia dialog.Dialog
+			var selectedRouteEvaluation = currentDexRouteEvaluation
+			var selectedOnlyDirectRoute = currentOnlyDirectRoute
+			var enteredDexBaseFeeLimit = new(big.Int).Set(currentDexBaseFeeLimit)
+			// var settingsChanged func()
+			// var isSettingsChanged bool
+			var enteredSlippage = currentDexSlippage
+			dexBaseFeeLimitEntry := widget.NewEntry()
+			dexBaseFeeLimitEntry.SetText(currentDexBaseFeeLimit.String())
+			slippageEntry := widget.NewEntryWithData(slippageBinding)
+			slippageEntry.SetPlaceHolder("Slippage Tolerance %")
+
+			routingOptions := widget.NewRadioGroup([]string{"Auto", "Direct routes only", "Lowest price impact", "Lowest price"}, func(s string) {
+
+			})
+			routingOptions.Required = true
+			switch currentDexRouteEvaluation {
+			case "auto":
+				if currentOnlyDirectRoute {
+					routingOptions.SetSelected("Direct routes only")
+				} else {
+					routingOptions.SetSelected("Auto")
+				}
+			case "lowestImpact":
+				routingOptions.SetSelected("Lowest price impact")
+			case "highestOutput":
+				routingOptions.SetSelected("Lowest price")
+			}
+
+			settingsForm := widget.NewForm(
+				widget.NewFormItem("Dex Base Fee Limit", dexBaseFeeLimitEntry),
+				widget.NewFormItem("Slippage Tolerance (%)", slippageEntry),
+				widget.NewFormItem("Routing Options", routingOptions),
+			)
+			var applyBtn *widget.Button
+			closeBtn := widget.NewButtonWithIcon("", theme.WindowCloseIcon(), func() { settingsDia.Hide() })
+			applyBtn = widget.NewButton("Apply", func() {
+				currentDexBaseFeeLimit = enteredDexBaseFeeLimit
+				currentDexRouteEvaluation = selectedRouteEvaluation
+				currentOnlyDirectRoute = selectedOnlyDirectRoute
+				amountEntry.Validate()
+				outAmountEntry.Validate()
+				applyBtn.Disable()
+			})
+			var applySave *widget.Button
+			applySave = widget.NewButton("Apply & Save", func() {
+				currentDexBaseFeeLimit = enteredDexBaseFeeLimit
+				currentDexRouteEvaluation = selectedRouteEvaluation
+				currentOnlyDirectRoute = selectedOnlyDirectRoute
+				amountEntry.Validate()
+				outAmountEntry.Validate()
+				userSettings.DexRouteEvaluation = selectedRouteEvaluation
+				userSettings.DexDirectRoute = selectedOnlyDirectRoute
+				userSettings.DexBaseFeeLimit = new(big.Int).Set(enteredDexBaseFeeLimit)
+				err := saveSettings()
+				if err != nil {
+					dialog.ShowError(err, mainWindowGui)
+				}
+				applySave.Disable()
+				applyBtn.Disable()
+
+			})
+			applyBtn.Disable()
+			applySave.Disable()
+
+			settingsForm.SetOnValidationChanged(func(err error) {
+				if err != nil {
+					applyBtn.Disable()
+					applySave.Disable()
+				} else if selectedOnlyDirectRoute != userSettings.DexDirectRoute || selectedRouteEvaluation != userSettings.DexRouteEvaluation || enteredDexBaseFeeLimit.Cmp(userSettings.DexBaseFeeLimit) != 0 {
+					applyBtn.Enable()
+					applySave.Enable()
+				}
+			})
+			slippageEntry.Validator = func(s string) error {
+				// Split the input string at the decimal point
+				parts := strings.Split(s, ".")
+				// Check if there are more than 2 decimals
+				if len(parts) > 1 && len(parts[1]) > 2 {
+					return fmt.Errorf("invalid slippage (must not have more than 2 decimal places)")
+				}
+				slippage, err := strconv.ParseFloat(s, 64)
+				if err != nil {
+					return err
+				} else if slippage < 0 {
+					return fmt.Errorf("invalid slippage (min 0)")
+				} else if slippage > 99 {
+					return fmt.Errorf("invalid slippage (max 99)")
+				} else {
+					enteredSlippage = slippage
+					return nil
+				}
+
+			}
+			dexBaseFeeLimitEntry.Validator = func(s string) error {
+				entry, err := new(big.Int).SetString(s, 10)
+				if !err || entry == nil {
+					return fmt.Errorf("only integer values")
+				} else if entry.Cmp(big.NewInt(10000)) <= 0 {
+					return fmt.Errorf("bigger than 10000")
+				}
+				// if settingsChanged != nil {
+				// 	settingsChanged()
+				// }
+
+				enteredDexBaseFeeLimit = entry
+				return nil
+			}
+			dexBaseFeeLimitEntry.OnChanged = func(s string) {
+				if dexBaseFeeLimitEntry.Validate() != nil || slippageEntry.Validate() != nil {
+					return
+				}
+				if enteredDexBaseFeeLimit.Cmp(userSettings.DexBaseFeeLimit) != 0 || enteredSlippage != userSettings.DexSlippage {
+					applyBtn.Enable()
+					applySave.Enable()
+
+				} else {
+					applyBtn.Disable()
+					applySave.Disable()
+				}
+
+			}
+
+			slippageEntry.OnChanged = func(s string) {
+				if dexBaseFeeLimitEntry.Validate() != nil || slippageEntry.Validate() != nil {
+					return
+				}
+				if enteredDexBaseFeeLimit.Cmp(userSettings.DexBaseFeeLimit) != 0 || enteredSlippage != userSettings.DexSlippage {
+					applyBtn.Enable()
+					applySave.Enable()
+
+				} else {
+					applyBtn.Disable()
+					applySave.Disable()
+				}
+			}
+
+			routingOptions.OnChanged = func(s string) {
+				if dexBaseFeeLimitEntry.Validate() != nil || slippageEntry.Validate() != nil {
+					return
+				}
+
+				switch s {
+				case "Auto":
+					selectedRouteEvaluation = "auto"
+					selectedOnlyDirectRoute = false
+				case "Direct routes only":
+					selectedRouteEvaluation = "auto"
+					selectedOnlyDirectRoute = true
+				case "Lowest price impact":
+					selectedRouteEvaluation = "lowestImpact"
+					selectedOnlyDirectRoute = false
+				case "Lowest price":
+					selectedRouteEvaluation = "highestOutput"
+					selectedOnlyDirectRoute = false
+				}
+
+				if enteredDexBaseFeeLimit.Cmp(userSettings.DexBaseFeeLimit) != 0 || enteredSlippage != userSettings.DexSlippage || selectedRouteEvaluation != userSettings.DexRouteEvaluation || selectedOnlyDirectRoute != userSettings.DexDirectRoute {
+					applyBtn.Enable()
+					applySave.Enable()
+
+				} else {
+					applyBtn.Disable()
+					applySave.Disable()
+				}
+			}
+
+			bttns := container.NewGridWithColumns(3, closeBtn, applyBtn, applySave)
+			sttgnsLyt := container.NewBorder(nil, bttns, nil, settingsForm)
+
+			settingsDia = dialog.NewCustomWithoutButtons("Dex Settings", sttgnsLyt, mainWindowGui)
+			settingsDia.Resize(fyne.NewSize(400, 225))
+			settingsDia.Show()
+		})
 		form := container.NewVBox(
 			inTokenLyt,
-
 			swapIcon,
 			outTokenLyt,
-			widget.NewLabel("Slippage Tolerance (%):"),
-			slippageLyt,
+			// widget.NewLabel("Slippage Tolerance (%):"),
+			// slippageLyt,
 			routeMessage,
 			warningMessage,
 			swapBtn,
-			widget.NewRichTextFromMarkdown("Powered by [Saturn Dex](https://saturn.stellargate.io/)"),
+			container.NewBorder(nil, nil, widget.NewRichTextFromMarkdown("Powered by [Saturn Dex](https://saturn.stellargate.io/)"), settingsBtn),
 		)
 		dexTab.Content = container.NewPadded(form)
 		return dexTab

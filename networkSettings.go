@@ -46,10 +46,8 @@ func showNetworkSettingsPage(creds Credentials) {
 	customChainTxExplorerLinkEntry.Disable()
 
 	defaultFeeLimit := widget.NewEntry()
-	dexBaseGasLimit := widget.NewEntry()
 	feeLimitSliderMin := widget.NewEntry()
 	feeLimitSliderMax := widget.NewEntry()
-	dexBaseGasLimit.SetText(userSettings.DexBaseFeeLimit.String())
 	feePrice := widget.NewEntry()
 	defaultFeeLimit.SetText(userSettings.DefaultGasLimit.String())
 	feeLimitSliderMin.SetText(strconv.FormatFloat(userSettings.GasLimitSliderMin, 'f', -1, 64))
@@ -66,7 +64,6 @@ func showNetworkSettingsPage(creds Credentials) {
 	feeSettingsForm := widget.NewForm(
 		widget.NewFormItem("Fee Price", feePrice),
 		widget.NewFormItem("Default Fee Limit", defaultFeeLimit),
-		widget.NewFormItem("Dex Base Fee Limit", dexBaseGasLimit),
 		widget.NewFormItem("", widget.NewLabel("Fee limit Slider Settings")),
 		widget.NewFormItem("Max", feeLimitSliderMax),
 		widget.NewFormItem("Min", feeLimitSliderMin),
@@ -75,7 +72,7 @@ func showNetworkSettingsPage(creds Credentials) {
 
 	// Inner validation function
 	validateEntries := func() {
-		dexBaseGasLimitValue, dexFeeErr := new(big.Int).SetString(dexBaseGasLimit.Text, 10)
+
 		defaultFeeLimitValue, defErr := new(big.Int).SetString(defaultFeeLimit.Text, 10)
 		feeLimitSliderMinValue, minErr := strconv.ParseFloat(feeLimitSliderMin.Text, 64)
 		feeLimitSliderMaxValue, maxErr := strconv.ParseFloat(feeLimitSliderMax.Text, 64)
@@ -83,11 +80,11 @@ func showNetworkSettingsPage(creds Credentials) {
 
 		valid := true
 
-		if !defErr || minErr != nil || maxErr != nil || !priceErr || !dexFeeErr || dexBaseGasLimitValue == nil {
+		if !defErr || minErr != nil || maxErr != nil || !priceErr {
 			valid = false
 		}
 
-		if valid && (dexBaseGasLimitValue.Cmp(big.NewInt(0)) < 0 || defaultFeeLimitValue.Cmp(big.NewInt(int64(feeLimitSliderMinValue))) < 0 || defaultFeeLimitValue.Cmp(big.NewInt(int64(feeLimitSliderMaxValue))) > 0) {
+		if valid && (defaultFeeLimitValue.Cmp(big.NewInt(int64(feeLimitSliderMinValue))) < 0 || defaultFeeLimitValue.Cmp(big.NewInt(int64(feeLimitSliderMaxValue))) > 0) {
 			valid = false
 		}
 
@@ -111,7 +108,7 @@ func showNetworkSettingsPage(creds Credentials) {
 	}
 
 	// Add validation to entries
-	dexBaseGasLimit.OnChanged = func(string) { validateEntries() }
+
 	defaultFeeLimit.OnChanged = func(string) { validateEntries() }
 	feeLimitSliderMin.OnChanged = func(string) { validateEntries() }
 	feeLimitSliderMax.OnChanged = func(string) { validateEntries() }
@@ -194,7 +191,6 @@ func showNetworkSettingsPage(creds Credentials) {
 		settingsForSave.GasLimitSliderMin, _ = strconv.ParseFloat(feeLimitSliderMin.Text, 64)
 		settingsForSave.DefaultGasLimit, _ = new(big.Int).SetString(defaultFeeLimit.Text, 10)
 		settingsForSave.GasPrice, _ = new(big.Int).SetString(feePrice.Text, 10)
-		userSettings.DexBaseFeeLimit, _ = new(big.Int).SetString(dexBaseGasLimit.Text, 10)
 
 		userSettings.GasLimitSliderMin = settingsForSave.GasLimitSliderMin
 		userSettings.GasLimitSliderMax = settingsForSave.GasLimitSliderMax
