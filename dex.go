@@ -134,16 +134,6 @@ func updatePools() {
 		saveDexPools()
 	}
 
-	// for _, pool := range poolList {
-	// 	poolTokens := strings.Split(pool, "_")
-
-	// 	dexPools[pool] = Pool{
-	// 		Reserve1: PoolReserve{Symbol: poolTokens[0]},
-	// 		Reserve2: PoolReserve{Symbol: poolTokens[1]},
-	// 	}
-
-	// }
-
 }
 
 func removeKey(poolWithKey string) string {
@@ -176,17 +166,6 @@ func generateToList(fromToken string, pools []string) []string {
 
 	return toList
 }
-
-// func selectedPool(inToken, outToken string) string {
-// 	for _, pool := range latestDexPools.PoolList {
-// 		if strings.Contains(pool, inToken) {
-// 			if strings.Contains(pool, outToken) {
-// 				return pool
-// 			}
-// 		}
-// 	}
-// 	return ""
-// }
 
 func getCountOfTokenPairsAndReserveKeys() int {
 	sb := scriptbuilder.BeginScript()
@@ -554,21 +533,6 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-// func calculateTotalPriceImpact(route []string, inAmount *big.Int) float64 {
-// 	totalPriceImpact := 0.0
-// 	currentAmount := inAmount
-
-// 	for _, pool := range route {
-// 		fmt.Println("calculating price impact for", pool)
-// 		poolReserves := getPoolReserves(pool)
-// 		priceImpact, outAmount, _, _ := calculateSwapAndPriceImpact(currentAmount, nil, poolReserves.Reserve1.Amount, poolReserves.Reserve2.Amount, "swapOut")
-// 		totalPriceImpact += priceImpact
-// 		currentAmount = outAmount
-// 	}
-
-// 	return totalPriceImpact
-// }
-
 func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) (*big.Int, error) {
 
 	fmt.Printf("calculating Swap Out\nin amount %v\nin reserves %v\nout reserves %v\n", inAmount, inReserves, outReserves)
@@ -579,45 +543,25 @@ func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) (*big.Int, err
 	if inAmount.Cmp(big.NewInt(10000)) < 0 { // saturn dex cant process less than 5 decimals
 		return nil, fmt.Errorf("in amount is too small")
 	}
-	pInAmount := new(big.Int).Mul(inAmount, big.NewInt(10)) // doing this for preventing rounding errors
-	pInReserves := new(big.Int).Mul(inReserves, big.NewInt(10))
-	pOutReserves := new(big.Int).Mul(outReserves, big.NewInt(10))
+
+	// doing this for preventing rounding errors,
+	// still someties it is causing troubles,
+	// actually i can solve it only subtracting 1 from out amounts but user can end some unwanted tokens from every route pool
+	// it happens bit rarely also PCS have stupid bugs for years so dont care now
+
+	pInAmount := new(big.Int).Mul(inAmount, big.NewInt(100))
+	pInReserves := new(big.Int).Mul(inReserves, big.NewInt(100))
+	pOutReserves := new(big.Int).Mul(outReserves, big.NewInt(100))
 
 	outAmount := big.NewInt(0)
-	// commonDecimal := outReserveDecimal - inReserveDecimal
-	// var normalizedInReserves *big.Int // added this to find a bug but it is unnecessary because it turned out i made a stupid decimal error
-	// var normalizedOutReserves *big.Int
-	// var normalizedInAmount *big.Int
-
-	// if commonDecimal > 0 {
-	// 	normalizedInReserves = new(big.Int).Mul(inReserves, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(commonDecimal)), nil))
-	// 	normalizedInAmount = new(big.Int).Mul(inAmount, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(commonDecimal)), nil))
-	// 	normalizedOutReserves = outReserves
-	// } else if commonDecimal < 0 {
-	// 	normalizedOutReserves = new(big.Int).Mul(outReserves, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-commonDecimal)), nil))
-	// 	normalizedInReserves = inReserves
-	// 	normalizedInAmount = inAmount
-
-	// } else {
-	// 	normalizedInReserves = inReserves
-	// 	normalizedOutReserves = outReserves
-	// 	normalizedInAmount = inAmount
-	// }
-
-	// fmt.Printf("-Normalized amounts\nin %v\nin reserve %v\nout reserve %v\n", normalizedInAmount, normalizedInReserves, normalizedOutReserves)
 
 	inAmountMul := new(big.Int).Mul(pInAmount, big.NewInt(997))
 	inAmountDiv := new(big.Int).Div(inAmountMul, big.NewInt(1000))
 	inAmountPlusReserves := new(big.Int).Add(inAmountDiv, pInReserves)
 	inReservesMulOut := new(big.Int).Mul(pInReserves, pOutReserves)
 	outAmount.Sub(pOutReserves, new(big.Int).Div(inReservesMulOut, inAmountPlusReserves))
-	outAmount.Div(outAmount, big.NewInt(10)) // for returning normal out
+	outAmount.Div(outAmount, big.NewInt(100)) // for returning normal out
 	fmt.Printf("-Calculation variables\ninAmountMul %v\ninAmountDiv %v\ninAmountPlusReserves %v\ninReservesMulOut %v\n", inAmountMul, inAmountDiv, inAmountPlusReserves, inReservesMulOut)
-
-	// // Renormalize the outAmount to the scale of inDecimals
-	// if commonDecimal < 0 {
-	// 	outAmount.Div(outAmount, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-commonDecimal)), nil))
-	// }
 
 	fmt.Printf("-Calculated Swap out Amount: %s\n", outAmount.String())
 
@@ -647,20 +591,25 @@ func calculateSwapIn(outAmount, inReserves, outReserves *big.Int) (*big.Int, err
 	const feeNumerator = 997
 	const feeDenominator = 1000
 
+	pOutAmount := new(big.Int).Mul(outAmount, big.NewInt(100))
+	pInReserves := new(big.Int).Mul(inReserves, big.NewInt(100))
+	pOutReserves := new(big.Int).Mul(outReserves, big.NewInt(100))
+
 	// Calculate the numerator: outAmount * inReserves * feeDenominator
-	numerator := new(big.Int).Mul(outAmount, inReserves)
+	numerator := new(big.Int).Mul(pOutAmount, pInReserves)
 	numerator = new(big.Int).Mul(numerator, big.NewInt(feeDenominator))
 
 	// Calculate the denominator: (outReserves - outAmount) * feeNumerator
-	denominator := new(big.Int).Sub(outReserves, outAmount)
+	denominator := new(big.Int).Sub(pOutReserves, pOutAmount)
 	denominator = new(big.Int).Mul(denominator, big.NewInt(feeNumerator))
 
 	// Calculate the input amount
 	inAmount := new(big.Int).Div(numerator, denominator)
 
 	// Adding one to handle rounding issues
-	inAmount = inAmount.Add(inAmount, big.NewInt(1))
-
+	//
+	inAmount.Div(inAmount, big.NewInt(100))
+	inAmount = inAmount.Add(inAmount, big.NewInt(2))
 	fmt.Printf("Calculate Swap In Amount: %s\n", inAmount.String())
 
 	if inAmount.Cmp(big.NewInt(10000)) < 0 { // saturn dex cant process less than 5 decimals
@@ -752,6 +701,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 		warningMessageBinding := binding.NewString()
 		warningMessageBinding.Set("Please select in token")
 		warningMessage := widget.NewLabelWithData(warningMessageBinding)
+		warningMessage.Truncation = fyne.TextTruncateEllipsis
 		outAmountEntry := widget.NewEntry()
 		var userTokens []string
 		for _, token := range latestAccountData.FungibleTokens {
@@ -817,7 +767,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 			}
 			routeWarning := ""
 			if len(dexTransaction) > 1 {
-				routeWarning = "⚠️During this swap, Spallet Routing is used.⚠️\n⚠️You might have some leftover tokens from the route pools.⚠️\n\n"
+				routeWarning = "⚠️During this swap, Spallet Routing is used.⚠️\n⚠️You might have some leftover tokens from the route pools.⚠️\n☣️If your swap fails try tweaking amount.☣️\n\n"
 			}
 			// Confirm swap
 			confirmMessage := fmt.Sprintf("%sSwap %s %s for estimated %s %s\nPrice Impact %.2f%% (or price increase for %s)\nSlippage: %.1f%%\nGas Fee: %s KCAL",
@@ -956,7 +906,6 @@ func createDexContent(creds Credentials) *container.Scroll {
 				outTokenSelected = true
 				checkSwapBtnState()
 				outAmountEntry.Enable()
-				// inAmount, _ := convertUserInputToBigInt(amountEntry.Text, latestAccountData.FungibleTokens[tokenInSelect.Selected].Decimals)
 				fmt.Println("finding best route for", input, tokenInSelect.Selected, tokenOutSelect.Selected)
 				swapRoutes, err := findAllSwapRoutes(latestDexPools.PoolList, tokenInSelect.Selected, tokenOutSelect.Selected, currentOnlyDirectRoute)
 				if err != nil {
@@ -1055,7 +1004,6 @@ func createDexContent(creds Credentials) *container.Scroll {
 					inAmountEntryCorrect = false
 
 				} else {
-					// warningMessageBinding.Set(fmt.Sprintf("You can swap from %s to %s", tokenInSelect.Selected, tokenOutSelect.Selected))
 					inAmountEntryCorrect = true
 				}
 				checkSwapBtnState()
@@ -1069,23 +1017,6 @@ func createDexContent(creds Credentials) *container.Scroll {
 				return fmt.Errorf("balance is not sufficent")
 			}
 		}
-
-		// slippageSaveBtn := widget.NewButton("Save as default", func() {
-		// 	if slippageEntry.Validate() == nil {
-		// 		slippage, _ := strconv.ParseFloat(slippageEntry.Text, 64)
-		// 		userSettings.DexSlippage = slippage
-		// 		err := saveSettings()
-		// 		if err == nil {
-
-		// 			dialog.ShowInformation("Saved successfully", fmt.Sprintf("Your default slippage is set to %.2f%%", slippage), mainWindowGui)
-		// 			slippageEntry.Validate()
-		// 		} else {
-		// 			dialog.ShowError(err, mainWindowGui)
-		// 		}
-
-		// 	}
-		// })
-		// slippageSaveBtn.Disable()
 
 		swapIcon := widget.NewLabelWithStyle("🢃", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 		maxBttn := widget.NewButton("Max", func() {
@@ -1112,13 +1043,6 @@ func createDexContent(creds Credentials) *container.Scroll {
 		inTokenSelect := container.NewHBox(widget.NewLabel("From\t"), tokenInSelect)
 		inTokenLyt := container.NewBorder(nil, nil, inTokenSelect, maxBttn, amountEntry)
 
-		// amountEntry.OnChanged = func(s string) {
-
-		// }
-
-		// outAmountEntry.Validator = func(s string) error {
-
-		// }
 		outAmountEntry.OnChanged = func(s string) {
 			fmt.Println("Out amount Changed to ", s)
 			outTokenData, _ := updateOrCheckCache(tokenOutSelect.Selected, 3, "check")
@@ -1238,9 +1162,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 			}
 
 		}
-		// outAmountEntry.Disable()
 
-		// slippageLyt := container.NewBorder(nil, nil, nil, slippageSaveBtn, slippageEntry)
 		outAmountEntry.SetPlaceHolder("Estimated out amount")
 		outTokenSelect := container.NewHBox(widget.NewLabel("To\t"), tokenOutSelect)
 		outTokenLyt := container.NewBorder(nil, nil, outTokenSelect, nil, outAmountEntry)
@@ -1249,8 +1171,6 @@ func createDexContent(creds Credentials) *container.Scroll {
 			var selectedRouteEvaluation = currentDexRouteEvaluation
 			var selectedOnlyDirectRoute = currentOnlyDirectRoute
 			var enteredDexBaseFeeLimit = new(big.Int).Set(currentDexBaseFeeLimit)
-			// var settingsChanged func()
-			// var isSettingsChanged bool
 			var enteredSlippage = currentDexSlippage
 			dexBaseFeeLimitEntry := widget.NewEntry()
 			dexBaseFeeLimitEntry.SetText(currentDexBaseFeeLimit.String())
@@ -1346,9 +1266,6 @@ func createDexContent(creds Credentials) *container.Scroll {
 				} else if entry.Cmp(big.NewInt(10000)) <= 0 {
 					return fmt.Errorf("bigger than 10000")
 				}
-				// if settingsChanged != nil {
-				// 	settingsChanged()
-				// }
 
 				enteredDexBaseFeeLimit = entry
 				return nil
@@ -1423,8 +1340,6 @@ func createDexContent(creds Credentials) *container.Scroll {
 			inTokenLyt,
 			swapIcon,
 			outTokenLyt,
-			// widget.NewLabel("Slippage Tolerance (%):"),
-			// slippageLyt,
 			routeMessage,
 			warningMessage,
 			swapBtn,
@@ -1510,7 +1425,7 @@ func executeSwap(route []TransactionDataForDex, slippageTolerance float64, creds
 }
 
 func monitorSwapTransaction(txHash string, creds Credentials) {
-	maxRetries := 30
+	maxRetries := 8 // 2 secs of block time so we are waiting for 2 block and that is enough
 	retryCount := 0
 	retryDelay := time.Millisecond * 500
 
