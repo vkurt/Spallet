@@ -545,9 +545,7 @@ func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) (*big.Int, err
 	}
 
 	// doing this for preventing rounding errors,
-	// still someties it is causing troubles,
-	// actually i can solve it only subtracting 1 from out amounts but user can end some unwanted tokens from every route pool
-	// it happens bit rarely also PCS have stupid bugs for years so dont care now
+	// it is causing failing route swaps because in amount for next pool can be bigger than user's balance,
 
 	pInAmount := new(big.Int).Mul(inAmount, big.NewInt(100))
 	pInReserves := new(big.Int).Mul(inReserves, big.NewInt(100))
@@ -556,10 +554,10 @@ func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) (*big.Int, err
 	outAmount := big.NewInt(0)
 
 	inAmountMul := new(big.Int).Mul(pInAmount, big.NewInt(997))
-	inAmountDiv := new(big.Int).Quo(inAmountMul, big.NewInt(1000))
+	inAmountDiv := new(big.Int).Div(inAmountMul, big.NewInt(1000))
 	inAmountPlusReserves := new(big.Int).Add(inAmountDiv, pInReserves)
 	inReservesMulOut := new(big.Int).Mul(pInReserves, pOutReserves)
-	outAmount.Sub(pOutReserves, new(big.Int).Quo(inReservesMulOut, inAmountPlusReserves))
+	outAmount.Sub(pOutReserves, new(big.Int).Div(inReservesMulOut, inAmountPlusReserves))
 	outAmount.Div(outAmount, big.NewInt(100)) // for returning normal out
 	fmt.Printf("-Calculation variables\ninAmountMul %v\ninAmountDiv %v\ninAmountPlusReserves %v\ninReservesMulOut %v\n", inAmountMul, inAmountDiv, inAmountPlusReserves, inReservesMulOut)
 
@@ -604,7 +602,7 @@ func calculateSwapIn(outAmount, inReserves, outReserves *big.Int) (*big.Int, err
 	denominator = new(big.Int).Mul(denominator, big.NewInt(feeNumerator))
 
 	// Calculate the input amount
-	inAmount := new(big.Int).Quo(numerator, denominator)
+	inAmount := new(big.Int).Div(numerator, denominator)
 
 	// Adding one to handle rounding issues
 	//
@@ -767,7 +765,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 			}
 			routeWarning := ""
 			if len(dexTransaction) > 1 {
-				routeWarning = "⚠️During this swap, Spallet Routing is used.⚠️\n⚠️You might have some leftover tokens from the route pools.⚠️\n☣️If your swap fails try tweaking amount.☣️\n\n"
+				routeWarning = "⚠️During this swap, Spallet Routing is used.⚠️\n⚠️You might have some leftover tokens from the route pools.⚠️\n☣️If your swap fails try tweaking amount or get some routing tokens.☣️\n\n"
 			}
 			// Confirm swap
 			confirmMessage := fmt.Sprintf("%sSwap %s %s for estimated %s %s\nPrice Impact %.2f%% (or price increase for %s)\nSlippage: %.1f%%\nGas Fee: %s KCAL",

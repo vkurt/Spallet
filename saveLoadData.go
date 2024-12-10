@@ -53,7 +53,7 @@ var defaultSettings = WalletSettings{
 	DexSlippage:        5,
 	DexBaseFeeLimit:    big.NewInt(30000),
 	DexRouteEvaluation: "auto",
-	DexDirectRoute:     false,
+	DexDirectRoute:     true,
 }
 
 func saveAddressBook(adrBk addressBook, pwd string) error {
