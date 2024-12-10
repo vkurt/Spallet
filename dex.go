@@ -556,10 +556,10 @@ func calculateSwapOut(inAmount, inReserves, outReserves *big.Int) (*big.Int, err
 	outAmount := big.NewInt(0)
 
 	inAmountMul := new(big.Int).Mul(pInAmount, big.NewInt(997))
-	inAmountDiv := new(big.Int).Div(inAmountMul, big.NewInt(1000))
+	inAmountDiv := new(big.Int).Quo(inAmountMul, big.NewInt(1000))
 	inAmountPlusReserves := new(big.Int).Add(inAmountDiv, pInReserves)
 	inReservesMulOut := new(big.Int).Mul(pInReserves, pOutReserves)
-	outAmount.Sub(pOutReserves, new(big.Int).Div(inReservesMulOut, inAmountPlusReserves))
+	outAmount.Sub(pOutReserves, new(big.Int).Quo(inReservesMulOut, inAmountPlusReserves))
 	outAmount.Div(outAmount, big.NewInt(100)) // for returning normal out
 	fmt.Printf("-Calculation variables\ninAmountMul %v\ninAmountDiv %v\ninAmountPlusReserves %v\ninReservesMulOut %v\n", inAmountMul, inAmountDiv, inAmountPlusReserves, inReservesMulOut)
 
@@ -604,7 +604,7 @@ func calculateSwapIn(outAmount, inReserves, outReserves *big.Int) (*big.Int, err
 	denominator = new(big.Int).Mul(denominator, big.NewInt(feeNumerator))
 
 	// Calculate the input amount
-	inAmount := new(big.Int).Div(numerator, denominator)
+	inAmount := new(big.Int).Quo(numerator, denominator)
 
 	// Adding one to handle rounding issues
 	//
@@ -1432,7 +1432,7 @@ func monitorSwapTransaction(txHash string, creds Credentials) {
 	fmt.Printf("Starting transaction monitoring for hash: %s\n", txHash)
 	var dexTxDia dialog.Dialog
 	resultDiaMessage := widget.NewLabel("")
-	resultDiaMessage.Wrapping = fyne.TextWrapWord
+	resultDiaMessage.Truncation = fyne.TextTruncateEllipsis
 	explorerBtn := widget.NewButton("Show on explorer", func() {
 		explorerURL := fmt.Sprintf("%s%s", userSettings.TxExplorerLink, txHash)
 		if parsedURL, err := url.Parse(explorerURL); err == nil {
@@ -1448,7 +1448,7 @@ func monitorSwapTransaction(txHash string, creds Credentials) {
 			fmt.Printf("Transaction monitoring timed out after %d retries\n", maxRetries)
 
 			messageHeader := widget.NewLabelWithStyle("Transaction monitoring timed out.", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-			resultDiaMessage.Text = fmt.Sprintf("Tx hash: %s\nPlease check the explorer manually", txHash[:30]+"...")
+			resultDiaMessage.Text = fmt.Sprintf("Tx hash: %s\nPlease check the explorer manually", txHash)
 			content := container.NewVBox(resultDiaMessage)
 			btns := container.NewVBox(explorerBtn, closeBtn)
 			lyt := container.NewBorder(messageHeader, btns, nil, nil, content)
@@ -1473,7 +1473,7 @@ func monitorSwapTransaction(txHash string, creds Credentials) {
 			}
 
 			messageHeader := widget.NewLabelWithStyle("Failed to get transaction status.", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-			resultDiaMessage.Text = fmt.Sprintf("Tx hash: %s\nPlease check the explorer manually\nErr: %v", txHash[:30]+"...", err)
+			resultDiaMessage.Text = fmt.Sprintf("Tx hash: %s\nPlease check the explorer manually\nErr: %v", txHash, err)
 			content := container.NewVBox(resultDiaMessage)
 			btns := container.NewVBox(explorerBtn, closeBtn)
 			lyt := container.NewBorder(messageHeader, btns, nil, nil, content)
@@ -1491,7 +1491,7 @@ func monitorSwapTransaction(txHash string, creds Credentials) {
 			messageHeader := widget.NewLabelWithStyle("Swap completed successfully", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 			fee, _ := new(big.Int).SetString(txResult.Fee, 10)
 			feeStr := formatBalance(*fee, kcalDecimals)
-			resultDiaMessage.Text = fmt.Sprintf("Tx hash:\t%s\nFee:\t\t%s", txHash[:30]+"...", feeStr)
+			resultDiaMessage.Text = fmt.Sprintf("Tx hash:\t%s\nFee:\t\t%s", txHash, feeStr)
 			content := container.NewVBox(resultDiaMessage)
 			btns := container.NewVBox(explorerBtn, closeBtn)
 			lyt := container.NewBorder(messageHeader, btns, nil, nil, content)
@@ -1508,7 +1508,7 @@ func monitorSwapTransaction(txHash string, creds Credentials) {
 			fmt.Printf("Transaction failed\n")
 
 			messageHeader := widget.NewLabelWithStyle("Swap failed", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-			resultDiaMessage.Text = fmt.Sprintf("Tx hash: %s", txHash[:30]+"...")
+			resultDiaMessage.Text = fmt.Sprintf("Tx hash: %s", txHash)
 			content := container.NewVBox(resultDiaMessage)
 			btns := container.NewVBox(explorerBtn, closeBtn)
 			lyt := container.NewBorder(messageHeader, btns, nil, nil, content)

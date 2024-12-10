@@ -29,19 +29,19 @@ func waitForTxResult(txHash string, creds Credentials) {
 			currentMainDialog.Hide()
 			fee, _ := new(big.Int).SetString(txResult.Fee, 10)
 			feeStr := formatBalance(*fee, kcalDecimals)
-			showTxResultDialog("Transaction successfully minted.", fmt.Sprintf("Tx hash:\t%s\nFee:\t\t%s Kcal", txResult.Hash[:30]+"...", feeStr), creds, txHash)
+			showTxResultDialog("Transaction successfully minted.", fmt.Sprintf("Tx hash:\t%s\nFee:\t\t%s Kcal", txResult.Hash, feeStr), creds, txHash)
 
 			break
 		} else if txResult.StateIsFault() {
 			fmt.Println("Transaction failed, tx hash: " + fmt.Sprint(txResult.Hash))
 			currentMainDialog.Hide()
-			showTxResultDialog("Transaction failed.", fmt.Sprintf("tx hash: %s", txResult.Hash[:30]+"..."), creds, txHash)
+			showTxResultDialog("Transaction failed.", fmt.Sprintf("tx hash: %s", txResult.Hash), creds, txHash)
 
 			break
 		} else if tries > 14 {
 			fmt.Println("Transaction Data fetch timed out, tx hash: " + fmt.Sprint(txResult.Hash))
 			currentMainDialog.Hide()
-			showTxResultDialog("Transaction Data fetch timed out.", fmt.Sprintf("tx hash: %s", txHash[:30]+"..."), creds, txHash)
+			showTxResultDialog("Transaction Data fetch timed out.", fmt.Sprintf("tx hash: %s", txHash), creds, txHash)
 
 			break
 		}
@@ -52,6 +52,7 @@ func waitForTxResult(txHash string, creds Credentials) {
 
 func showTxResultDialog(header string, result string, cred Credentials, txHash string) {
 	resultLabel := widget.NewLabel(result)
+	resultLabel.Truncation = fyne.TextTruncateEllipsis
 	headerLabel := widget.NewLabelWithStyle(header, fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 	resultLabel.Wrapping = fyne.TextWrapWord
 	var resultDia dialog.Dialog
