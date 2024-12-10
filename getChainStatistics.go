@@ -30,7 +30,7 @@ func getChainStatistics() error {
 	currentTime := time.Now().Unix()
 	passedTimeFromLastFetch := currentTime - latestChainStatisticsData.DataFetchTime
 
-	if passedTimeFromLastFetch > 9 {
+	if passedTimeFromLastFetch > 3600 {
 		fmt.Println("******Refreshing data from chain for chain stats*********")
 		latestChainStatisticsData.DataFetchTime = currentTime
 
@@ -65,6 +65,9 @@ func getChainStatistics() error {
 		script = sb.EndScript()
 		encodedScript = hex.EncodeToString(script)
 		response, err = client.InvokeRawScript(userSettings.ChainName, encodedScript)
+		if err != nil {
+			return fmt.Errorf("error fetching chain statistics: %v", err)
+		}
 
 		latestChainStatisticsData.LastInflationTimeStamp = response.DecodeResults(0).AsNumber().Int64()
 
@@ -98,9 +101,7 @@ func getChainStatistics() error {
 		// Convert result to float64
 		soulMasterAprFloat, _ := soulMasterAprBig.Float64()
 		latestChainStatisticsData.SMApr = soulMasterAprFloat
-		if err != nil {
-			return fmt.Errorf("error fetching chain statistics: %v", err)
-		}
+
 		// saveLatestChainData("chainstats", latestChainStatisticsData)
 		return nil
 

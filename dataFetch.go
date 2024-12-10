@@ -72,7 +72,11 @@ func autoUpdate(timeout int, creds Credentials) {
 
 		for range updateBalanceTimeOut.C {
 			fmt.Println("****Auto Update Balances*****")
-			dataFetch(creds)
+			err := dataFetch(creds)
+			if err != nil {
+				dialog.ShowError(fmt.Errorf("an error happened during auto data fetch,\n %v", err), mainWindowGui)
+
+			}
 		}
 	}()
 }
@@ -181,11 +185,8 @@ func dataFetch(creds Credentials) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("***********reading chain*************")
-		err = getChainStatistics()
-		if err != nil {
-			return err
-		}
+		fmt.Println("-reading chain for main tokens")
+
 		latestTokenData.ChainTokenUpdateTime = currentUtcTime
 	}
 
@@ -210,16 +211,23 @@ func updateOrCheckCache(symbol string, retries int, updateType string) (TokenDat
 	case "accfungible":
 		fmt.Println("-Updating acc Token Data")
 		for _, userToken := range latestAccountData.FungibleTokens {
-			_, tokenData, _ := checkChainForTokenInfo(retries, userToken.Symbol)
-			latestTokenData.Token[userToken.Symbol] = tokenData
+			_, tokenData, err := checkChainForTokenInfo(retries, userToken.Symbol)
+			if err == nil {
+				latestTokenData.Token[userToken.Symbol] = tokenData
+			}
+
 		}
 		saveTokenCache()
 		return TokenData{}, nil
 	case "accnft": //will update all User token data
 		fmt.Println("-Updating acc nft Data")
 		for _, userToken := range latestAccountData.NonFungible {
-			_, tokenData, _ := checkChainForTokenInfo(retries, userToken.Symbol)
-			latestTokenData.Token[userToken.Symbol] = tokenData
+			_, tokenData, err := checkChainForTokenInfo(retries, userToken.Symbol)
+
+			if err == nil {
+				latestTokenData.Token[userToken.Symbol] = tokenData
+			}
+
 		}
 		saveTokenCache()
 		return TokenData{}, nil
@@ -227,13 +235,18 @@ func updateOrCheckCache(symbol string, retries int, updateType string) (TokenDat
 	case "acc":
 		fmt.Println("-Updating acc Token Data")
 		for _, userToken := range latestAccountData.FungibleTokens {
-			_, tokenData, _ := checkChainForTokenInfo(retries, userToken.Symbol)
-			latestTokenData.Token[userToken.Symbol] = tokenData
+			_, tokenData, err := checkChainForTokenInfo(retries, userToken.Symbol)
+			if err == nil {
+				latestTokenData.Token[userToken.Symbol] = tokenData
+			}
 		}
 
 		for _, userToken := range latestAccountData.NonFungible {
-			_, tokenData, _ := checkChainForTokenInfo(retries, userToken.Symbol)
-			latestTokenData.Token[userToken.Symbol] = tokenData
+			_, tokenData, err := checkChainForTokenInfo(retries, userToken.Symbol)
+			if err == nil {
+				latestTokenData.Token[userToken.Symbol] = tokenData
+			}
+
 		}
 		latestTokenData.AccTokenUpdateTime = time.Now().UTC().Unix()
 		saveTokenCache()
@@ -243,8 +256,11 @@ func updateOrCheckCache(symbol string, retries int, updateType string) (TokenDat
 		fmt.Println("-Updating Chain Token Data")
 		chainTokens := []string{"SOUL", "KCAL", "CROWN"}
 		for _, token := range chainTokens {
-			_, tokenData, _ := checkChainForTokenInfo(retries, token)
-			latestTokenData.Token[token] = tokenData
+			_, tokenData, err := checkChainForTokenInfo(retries, token)
+			if err == nil {
+				latestTokenData.Token[token] = tokenData
+			}
+
 		}
 		latestTokenData.ChainTokenUpdateTime = time.Now().UTC().Unix()
 		saveTokenCache()
@@ -256,9 +272,11 @@ func updateOrCheckCache(symbol string, retries int, updateType string) (TokenDat
 		latestTokenData.AllTokenUpdateTime = time.Now().UTC().Unix()
 		for _, token := range latestTokenData.Token {
 			cantFindTokenData, tokenData, _ := checkChainForTokenInfo(retries, token.Symbol)
-			latestTokenData.Token[tokenData.Symbol] = tokenData
+
 			if cantFindTokenData {
 				break
+			} else {
+				latestTokenData.Token[tokenData.Symbol] = tokenData
 			}
 
 		}
@@ -299,9 +317,14 @@ func updateOrCheckCache(symbol string, retries int, updateType string) (TokenDat
 			}
 			return tokenData, nil
 		} else {
-			_, tokenData, _ := checkChainForTokenInfo(retries, symbol)
-			latestTokenData.Token[symbol] = tokenData
-			saveTokenCache()
+			_, tokenData, err := checkChainForTokenInfo(retries, symbol)
+			if err == nil {
+				latestTokenData.Token[symbol] = tokenData
+				saveTokenCache()
+			} else {
+				dialog.ShowError(err, mainWindowGui)
+			}
+
 		}
 
 	}

@@ -54,7 +54,9 @@ var (
 )
 
 type DexPools struct {
-	PoolKeyCount int      `json:"pool_count"`
+	Network      string   `json:"network"`
+	Chain        string   `json:"chain"`
+	PoolKeyCount int      `json:"pool_key_count"`
 	PoolList     []string `json:"pool_list"`
 }
 
@@ -82,13 +84,22 @@ func generateFromList(userTokens []string, pools []string) []string {
 
 	return fromListSlice
 }
-func updatePools() {
+func updatePools() error {
 
-	currentPoolCount := getCountOfTokenPairsAndReserveKeys()
+	currentPoolCount, err := getCountOfTokenPairsAndReserveKeys()
+	if err != nil {
+		return err
+	}
 
-	if latestDexPools.PoolKeyCount < currentPoolCount {
+	if latestDexPools.PoolKeyCount < currentPoolCount || latestDexPools.Chain != userSettings.ChainName || latestDexPools.Network != userSettings.NetworkName {
 		checkFrom := latestDexPools.PoolKeyCount
 		latestDexPools.PoolKeyCount = currentPoolCount
+		if latestDexPools.Chain != userSettings.ChainName || latestDexPools.Network != userSettings.NetworkName {
+			checkFrom = 0
+			latestDexPools.PoolList = []string{}
+			latestDexPools.Chain = userSettings.ChainName
+			latestDexPools.Network = userSettings.NetworkName
+		}
 
 		for i := checkFrom; i < currentPoolCount; i++ {
 			var maxCheck int
@@ -114,7 +125,7 @@ func updatePools() {
 			responsePairKeys, err := client.InvokeRawScript(userSettings.ChainName, encodedScript)
 			if err != nil {
 				dialog.ShowError(fmt.Errorf("an error happened during updating pools!\n%v ", err.Error()), mainWindowGui)
-				return
+				return err
 			}
 
 			fmt.Println("Result count ", len(responsePairKeys.Results))
@@ -133,7 +144,7 @@ func updatePools() {
 
 		saveDexPools()
 	}
-
+	return nil
 }
 
 func removeKey(poolWithKey string) string {
@@ -167,7 +178,7 @@ func generateToList(fromToken string, pools []string) []string {
 	return toList
 }
 
-func getCountOfTokenPairsAndReserveKeys() int {
+func getCountOfTokenPairsAndReserveKeys() (int, error) {
 	sb := scriptbuilder.BeginScript()
 	sb.CallContract("SATRN", "getCountOfTokenPairsAndReserveKeysOnList")
 	script := sb.EndScript()
@@ -175,13 +186,13 @@ func getCountOfTokenPairsAndReserveKeys() int {
 
 	response, err := client.InvokeRawScript(userSettings.ChainName, encodedScript)
 	if err != nil {
-		panic("Script1 invocation failed! Error: " + err.Error())
+		return 0, err
 	}
 
 	count := response.DecodeResult().AsNumber().Int64()
 
 	fmt.Printf("Total token pairs and reserve keys listed: %v\n", count)
-	return int(count)
+	return int(count), nil
 }
 
 // gets pool reserves from pool name
@@ -706,7 +717,11 @@ func createDexContent(creds Credentials) *container.Scroll {
 			userTokens = append(userTokens, token.Symbol)
 
 		}
-		updatePools()
+		err := updatePools()
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("an error happened,%v", err), mainWindowGui)
+			return container.NewVScroll(widget.NewLabel("an error happened"))
+		}
 
 		fmt.Println("user token count, pool count", len(userTokens), len(latestDexPools.PoolList))
 		fromList := generateFromList(userTokens, latestDexPools.PoolList)

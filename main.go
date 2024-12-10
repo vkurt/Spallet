@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"math/big"
 	"net/url"
 	"time"
@@ -176,52 +175,63 @@ func showExistingUserLogin() {
 			} else {
 				userAddressBook = ldAddrBk
 			}
-			autoUpdate(updateInterval, creds)
+
 			showUpdatingDialog()
-			loadSettings("data/essential/settings.spallet")                       // Load settings at startup
-			loadTokenCache()                                                      // this will update  tokens data from cache if user dont dave cache yet it will create one with main tokens
-			latestTokenData.ChainTokenUpdateTime = time.Now().UTC().Unix() - 3584 // we will update data automaticaly 15 sec after login with auto update
-			latestTokenData.AllTokenUpdateTime = time.Now().UTC().Unix()
-			latestTokenData.AccTokenUpdateTime = time.Now().UTC().Unix()
-			var foundWalletNumber = 0
-			var listedWallets = len(creds.WalletOrder)
-			for _, found := range creds.Wallets { //check if there is a unvisible wallet we have
-				var notListedFounded = true
-				for _, listed := range creds.WalletOrder {
-					if found.Name == listed {
-						notListedFounded = false
-						continue
+			loadSettings("data/essential/settings.spallet") // Load settings at startup
+			loadTokenCache()
 
-					}
-					fmt.Println("found not listed wallet ", notListedFounded)
-
-				}
-
-				if notListedFounded {
-					creds.WalletOrder = append(creds.WalletOrder, found.Name)
-				}
-				foundWalletNumber++
-				fmt.Println("found wallet ", found.Name)
-			}
-			if foundWalletNumber != listedWallets {
-				if err := saveCredentials(creds); err != nil {
-					log.Println("Failed to save credentials:", err)
-					closeUpdatingDialog()
-					dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), fyne.CurrentApp().Driver().AllWindows()[0])
-					return
-				}
-			}
-
-			if err := dataFetch(creds); err != nil {
+			err = getChainStatistics()
+			if err != nil {
 				closeUpdatingDialog()
-				dialog.ShowInformation("Error", "Failed to get wallet balance: "+err.Error(), mainWindowGui)
+				dialog.ShowError(fmt.Errorf("an error happened during fetching data,\n %v", err), mainWindowGui)
 				return
 			} else {
-
+				dataFetch(creds)
+				autoUpdate(updateInterval, creds)
+				latestTokenData.ChainTokenUpdateTime = time.Now().UTC().Unix() - 3590 // we will update data automaticaly 15 sec after login with auto update
+				latestTokenData.AllTokenUpdateTime = time.Now().UTC().Unix()
+				latestTokenData.AccTokenUpdateTime = time.Now().UTC().Unix()
 				mainWindow(creds)
 				closeUpdatingDialog()
 				startLogoutTicker(userSettings.LgnTmeOut)
 			}
+			// this will update  tokens data from cache if user dont dave cache yet it will create one with main tokens
+
+			// var foundWalletNumber = 0
+			// var listedWallets = len(creds.WalletOrder)
+			// for _, found := range creds.Wallets { //check if there is a unvisible wallet we have
+			// 	var notListedFounded = true
+			// 	for _, listed := range creds.WalletOrder {
+			// 		if found.Name == listed {
+			// 			notListedFounded = false
+			// 			continue
+
+			// 		}
+			// 		fmt.Println("found not listed wallet ", notListedFounded)
+
+			// 	}
+
+			// 	if notListedFounded {
+			// 		creds.WalletOrder = append(creds.WalletOrder, found.Name)
+			// 	}
+			// 	foundWalletNumber++
+			// 	fmt.Println("found wallet ", found.Name)
+			// }
+			// if foundWalletNumber != listedWallets {
+			// 	if err := saveCredentials(creds); err != nil {
+			// 		log.Println("Failed to save credentials:", err)
+			// 		closeUpdatingDialog()
+			// 		dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), fyne.CurrentApp().Driver().AllWindows()[0])
+			// 		return
+			// 	}
+			// }
+
+			// 			if err := dataFetch(creds); err != nil {
+			// 				closeUpdatingDialog()
+			// 				dialog.ShowInformation("Error", "Failed to get wallet balance: "+err.Error(), mainWindowGui)
+			// 				return
+			// 			} else {
+			// }
 
 		} else {
 			dialog.ShowInformation("Error", "Invalid password", mainWindowGui)
