@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +18,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/phantasma-io/phantasma-go/pkg/blockchain"
 	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-go/pkg/rpc/response"
 	scriptbuilder "github.com/phantasma-io/phantasma-go/pkg/vm/script_builder"
 )
 
@@ -1438,39 +1438,20 @@ func executeSwap(route []TransactionDataForDex, slippageTolerance float64, creds
 }
 
 func monitorSwapTransaction(txHash string, creds Credentials) {
-	maxRetries := 8 // 2 secs of block time so we are waiting for 2 block and that is enough
+	maxRetries := 12 // 2 secs of block time so we are waiting for 3 block and that is enough
 	retryCount := 0
 	retryDelay := time.Millisecond * 500
 
 	fmt.Printf("Starting transaction monitoring for hash: %s\n", txHash)
-	var dexTxDia dialog.Dialog
-	resultDiaMessage := widget.NewLabel("")
-	resultDiaMessage.Truncation = fyne.TextTruncateEllipsis
-	explorerBtn := widget.NewButton("Show on explorer", func() {
-		explorerURL := fmt.Sprintf("%s%s", userSettings.TxExplorerLink, txHash)
-		if parsedURL, err := url.Parse(explorerURL); err == nil {
-			fyne.CurrentApp().OpenURL(parsedURL)
-		}
 
-	})
-	closeBtn := widget.NewButtonWithIcon("", theme.WindowCloseIcon(), func() {
-		dexTxDia.Hide()
-	})
 	for {
 		if retryCount >= maxRetries {
 			fmt.Printf("Transaction monitoring timed out after %d retries\n", maxRetries)
 
-			messageHeader := widget.NewLabelWithStyle("Transaction monitoring timed out.", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-			resultDiaMessage.Text = fmt.Sprintf("Tx hash: %s\nPlease check the explorer manually", txHash)
-			content := container.NewVBox(resultDiaMessage)
-			btns := container.NewVBox(explorerBtn, closeBtn)
-			lyt := container.NewBorder(messageHeader, btns, nil, nil, content)
-			dexTxDia = dialog.NewCustomWithoutButtons("Transaction Result", lyt, mainWindowGui)
-			dexTxDia.Resize(fyne.NewSize(400, 225))
-			dataFetch(creds)
+			showTxResultDialog("Transaction monitoring timed out.", creds, response.TransactionResult{Hash: txHash, Fee: "0"})
 			createDexContent(creds)
 			dexTab.Refresh()
-			dexTxDia.Show()
+
 			return
 		}
 
@@ -1485,52 +1466,30 @@ func monitorSwapTransaction(txHash string, creds Credentials) {
 				continue
 			}
 
-			messageHeader := widget.NewLabelWithStyle("Failed to get transaction status.", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-			resultDiaMessage.Text = fmt.Sprintf("Tx hash: %s\nPlease check the explorer manually\nErr: %v", txHash, err)
-			content := container.NewVBox(resultDiaMessage)
-			btns := container.NewVBox(explorerBtn, closeBtn)
-			lyt := container.NewBorder(messageHeader, btns, nil, nil, content)
-			dexTxDia = dialog.NewCustomWithoutButtons("Transaction Result", lyt, mainWindowGui)
-			dexTxDia.Resize(fyne.NewSize(400, 225))
-			dataFetch(creds)
+			showTxResultDialog("Failed to get transaction status.", creds, response.TransactionResult{Hash: txHash, Fee: "0"})
+
 			createDexContent(creds)
 			dexTab.Refresh()
-			dexTxDia.Show()
+
 			return
 		}
 
 		if txResult.StateIsSuccess() {
 			fmt.Printf("Transaction successful\n")
-			messageHeader := widget.NewLabelWithStyle("Swap completed successfully", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-			fee, _ := new(big.Int).SetString(txResult.Fee, 10)
-			feeStr := formatBalance(*fee, kcalDecimals)
-			resultDiaMessage.Text = fmt.Sprintf("Tx hash:\t%s\nFee:\t\t%s", txHash, feeStr)
-			content := container.NewVBox(resultDiaMessage)
-			btns := container.NewVBox(explorerBtn, closeBtn)
-			lyt := container.NewBorder(messageHeader, btns, nil, nil, content)
-			dexTxDia = dialog.NewCustomWithoutButtons("Transaction Result", lyt, mainWindowGui)
-			dexTxDia.Resize(fyne.NewSize(400, 225))
-			dataFetch(creds)
+
+			showTxResultDialog("Swap completed successfully.", creds, txResult)
+
 			createDexContent(creds)
 			dexTab.Refresh()
-			dexTxDia.Show()
 
 			return
 		}
 		if txResult.StateIsFault() {
 			fmt.Printf("Transaction failed\n")
+			showTxResultDialog("Swap failed.", creds, txResult)
 
-			messageHeader := widget.NewLabelWithStyle("Swap failed", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-			resultDiaMessage.Text = fmt.Sprintf("Tx hash: %s", txHash)
-			content := container.NewVBox(resultDiaMessage)
-			btns := container.NewVBox(explorerBtn, closeBtn)
-			lyt := container.NewBorder(messageHeader, btns, nil, nil, content)
-			dexTxDia = dialog.NewCustomWithoutButtons("Transaction Result", lyt, mainWindowGui)
-			dexTxDia.Resize(fyne.NewSize(400, 225))
-			dataFetch(creds)
 			createDexContent(creds)
 			dexTab.Refresh()
-			dexTxDia.Show()
 
 			return
 		}

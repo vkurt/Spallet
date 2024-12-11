@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
 
 	"fyne.io/fyne/v2"
@@ -24,11 +25,11 @@ func NewSelectableCard(title, subtitle string, image fyne.Resource, buttonLabel 
 	img.SetMinSize(fyne.NewSize(100, 100)) // Set a smaller size for the image
 
 	button := widget.NewButton(buttonLabel, buttonFunc) // Use the button function parameter here
-
+	label := widget.NewLabel(fmt.Sprintf("%s\n%s", title, subtitle))
+	label.Truncation = fyne.TextTruncateEllipsis
 	cardContent := container.NewVBox(
 		img,
-		widget.NewLabel(title),
-		widget.NewLabel(subtitle),
+		label,
 		button, // Add the button here
 	)
 

@@ -11,12 +11,14 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/phantasma-io/phantasma-go/pkg/rpc/response"
 	"github.com/phantasma-io/phantasma-go/pkg/util"
 )
 
 func waitForTxResult(txHash string, creds Credentials) {
 	tries := 0
 	txResult, _ := client.GetTransaction(txHash)
+
 	for {
 		if tries > 0 {
 			txResult, _ = client.GetTransaction(txHash)
@@ -27,21 +29,20 @@ func waitForTxResult(txHash string, creds Credentials) {
 		} else if txResult.StateIsSuccess() {
 			fmt.Println("Transaction successfully minted, tx hash: " + fmt.Sprint(txResult.Hash))
 			currentMainDialog.Hide()
-			fee, _ := new(big.Int).SetString(txResult.Fee, 10)
-			feeStr := formatBalance(*fee, kcalDecimals)
-			showTxResultDialog("Transaction successfully minted.", fmt.Sprintf("Tx hash:\t%s\nFee:\t\t%s Kcal", txResult.Hash, feeStr), creds, txHash)
+
+			showTxResultDialog("Transaction successfully minted.", creds, txResult)
 
 			break
 		} else if txResult.StateIsFault() {
 			fmt.Println("Transaction failed, tx hash: " + fmt.Sprint(txResult.Hash))
 			currentMainDialog.Hide()
-			showTxResultDialog("Transaction failed.", fmt.Sprintf("tx hash: %s", txResult.Hash), creds, txHash)
+			showTxResultDialog("Transaction failed.", creds, txResult)
 
 			break
 		} else if tries > 14 {
 			fmt.Println("Transaction Data fetch timed out, tx hash: " + fmt.Sprint(txResult.Hash))
 			currentMainDialog.Hide()
-			showTxResultDialog("Transaction Data fetch timed out.", fmt.Sprintf("tx hash: %s", txHash), creds, txHash)
+			showTxResultDialog("Transaction Data fetch timed out.", creds, response.TransactionResult{Hash: txHash, Fee: "0"})
 
 			break
 		}
@@ -50,15 +51,23 @@ func waitForTxResult(txHash string, creds Credentials) {
 	}
 }
 
-func showTxResultDialog(header string, result string, cred Credentials, txHash string) {
-	resultLabel := widget.NewLabel(result)
+func showTxResultDialog(header string, cred Credentials, txResult response.TransactionResult) {
+	fee, err := new(big.Int).SetString(txResult.Fee, 10)
+	if fee == nil || !err {
+		fee = big.NewInt(0)
+	}
+	feeStr := formatBalance(*fee, kcalDecimals)
+
+	resultMessage := fmt.Sprintf("Tx hash:\t%v\nFee:\t\t%v Kcal", txResult.Hash, feeStr)
+	resultLabel := widget.NewLabel(resultMessage)
 	resultLabel.Truncation = fyne.TextTruncateEllipsis
+
 	headerLabel := widget.NewLabelWithStyle(header, fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-	resultLabel.Wrapping = fyne.TextWrapWord
+
 	var resultDia dialog.Dialog
 	dataFetch(cred)
 	explorerBtn := widget.NewButton("Show on explorer", func() {
-		explorerURL := fmt.Sprintf("%s%s", userSettings.TxExplorerLink, txHash)
+		explorerURL := fmt.Sprintf("%s%s", userSettings.TxExplorerLink, txResult.Hash)
 		if parsedURL, err := url.Parse(explorerURL); err == nil {
 			fyne.CurrentApp().OpenURL(parsedURL)
 		}
@@ -74,29 +83,25 @@ func showTxResultDialog(header string, result string, cred Credentials, txHash s
 	btns := container.NewVBox(explorerBtn, closeBtn)
 	resultLyt := container.NewBorder(headerLabel, btns, nil, nil, resultLabel)
 
-	d := dialog.NewCustomWithoutButtons("Transaction Result", resultLyt, mainWindowGui)
-	d.Resize(fyne.NewSize(400, 225))
-	resultDia = d
-	currentMainDialog.Hide()
+	resultDia = dialog.NewCustomWithoutButtons("Transaction Result", resultLyt, mainWindowGui)
+	resultDia.Resize(fyne.NewSize(400, 225))
+	if currentMainDialog != nil {
+		currentMainDialog.Hide()
+	}
 	resultDia.Show()
 }
 
 // SendTransaction sends a transaction and handles the result
-func SendTransaction(txHex string, creds Credentials, onSuccess func(string, Credentials), onFailure func(error, Credentials, string)) {
+func SendTransaction(txHex string, creds Credentials) {
 	go func() {
 		txHash, err := client.SendRawTransaction(txHex)
 		if err != nil || util.ErrorDetect(txHash) {
-			onFailure(err, creds, txHash)
+			dialog.ShowError(fmt.Errorf("an error happened during sending transaction,\n%v", err), mainWindowGui)
+			if currentMainDialog != nil {
+				currentMainDialog.Hide()
+			}
 		} else {
-			onSuccess(txHash, creds)
+			waitForTxResult(txHash, creds)
 		}
 	}()
-}
-
-func handleSuccess(txHash string, creds Credentials) {
-	waitForTxResult(txHash, creds)
-}
-
-func handleFailure(err error, creds Credentials, txHash string) {
-	showTxResultDialog("Transaction failed.", fmt.Sprintf("%v", err), creds, txHash)
 }

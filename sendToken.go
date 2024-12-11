@@ -79,7 +79,7 @@ func sendTransaction(WIF, tokenSymbol, to string, tokenAmount *big.Int, creds Cr
 	// defer close(stopChan) when you need to ensure it gets closed properly.
 
 	// Send the transaction
-	SendTransaction(txHex, creds, handleSuccess, handleFailure)
+	SendTransaction(txHex, creds)
 
 }
 

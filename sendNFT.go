@@ -80,7 +80,7 @@ func sendNFTTransaction(WIF string, nftsToSend map[string][]string, to string, c
 	// defer close(stopChan) when you need to ensure it gets closed properly.
 
 	// Send the transaction
-	SendTransaction(txHex, creds, handleSuccess, handleFailure)
+	SendTransaction(txHex, creds)
 }
 
 func showSendNFTDia(symbol string, creds Credentials) {
@@ -280,7 +280,7 @@ func showSendNFTDia(symbol string, creds Credentials) {
 			currentMainDialog.Hide()
 		})
 		buttonsBox := container.NewGridWithColumns(2, backButton, sendButton)
-		gasSliderBox := container.NewVBox(container.NewGridWithRows(3, gasSliderLabel, gasSlider, warningLabel))
+		gasSliderBox := container.NewVBox(container.NewBorder(nil, nil, gasSliderLabel, nil, gasSlider), warningLabel)
 		// Create checkboxes for each NFT ID
 		for _, nft := range latestAccountData.NonFungible {
 			if nft.Symbol == symbol {
@@ -291,13 +291,13 @@ func showSendNFTDia(symbol string, creds Credentials) {
 				}
 				for _, id := range nft.Ids {
 					title := id
-					if len(title) > 20 {
-						title = title[:17] + "..."
-					}
+					//  if len(title) > 20 {
+					// 	title = title[:17] + "..."
+					// }
 					subTitle := id
-					if len(subTitle) > 20 {
-						subTitle = subTitle[:17] + "..."
-					}
+					// if len(subTitle) > 20 {
+					// 	subTitle = subTitle[:17] + "..."
+					// }
 					check := NewSelectableCard(title, subTitle, img, "Details", func() {}, func(selected bool) {
 						if selected {
 							fmt.Printf("Selected NFT: %s\n", id)

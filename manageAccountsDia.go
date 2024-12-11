@@ -176,7 +176,8 @@ func manageAccountsDia(creds Credentials) {
 						}
 						if creds.LastSelectedWallet == walletName {
 							creds.LastSelectedWallet = renameEntry.Text
-							mainWindow(creds)
+							autoUpdate(updateInterval, creds)
+
 						}
 						if err := saveCredentials(creds); err != nil {
 							dialog.NewError(err, mainWindowGui)
@@ -252,6 +253,7 @@ func manageAccountsDia(creds Credentials) {
 							}
 							if walletName == creds.LastSelectedWallet && len(creds.WalletOrder) > 0 {
 								creds.LastSelectedWallet = creds.WalletOrder[0]
+								autoUpdate(updateInterval, creds)
 
 							} else if walletName == creds.LastSelectedWallet && len(creds.WalletOrder) == 0 {
 								creds.LastSelectedWallet = ""
@@ -342,7 +344,7 @@ func manageAccountsDia(creds Credentials) {
 									// defer close(stopChan) when you need to ensure it gets closed properly.
 
 									// Send the transaction
-									SendTransaction(txHex, creds, handleSuccess, handleFailure)
+									SendTransaction(txHex, creds)
 									autoUpdate(updateInterval, creds)
 								})
 
@@ -514,7 +516,7 @@ func manageAccountsDia(creds Credentials) {
 								// defer close(stopChan) when you need to ensure it gets closed properly.
 
 								// Send the transaction
-								SendTransaction(txHex, creds, handleSuccess, handleFailure)
+								SendTransaction(txHex, creds)
 								autoUpdate(updateInterval, creds)
 								mainWindow(creds)
 							})
@@ -700,7 +702,7 @@ func manageAccountsDia(creds Credentials) {
 									// defer close(stopChan) when you need to ensure it gets closed properly.
 
 									// Send the transaction
-									SendTransaction(txHex, creds, handleSuccess, handleFailure)
+									SendTransaction(txHex, creds)
 									autoUpdate(updateInterval, creds)
 									mainWindow(creds)
 

@@ -67,7 +67,7 @@ func showStakingPage(creds Credentials) {
 				// defer close(stopChan) when you need to ensure it gets closed properly.
 
 				// Send the transaction
-				SendTransaction(txHex, creds, handleSuccess, handleFailure)
+				SendTransaction(txHex, creds)
 			})
 			cancelButton := widget.NewButton("Maybe later", func() {
 				currentMainDialog.Hide()
@@ -160,7 +160,7 @@ func showStakingPage(creds Credentials) {
 				// defer close(stopChan) when you need to ensure it gets closed properly.
 
 				// Send the transaction
-				SendTransaction(txHex, creds, handleSuccess, handleFailure)
+				SendTransaction(txHex, creds)
 			})
 			cancelButton := widget.NewButton("Maybe later", func() {
 				currentMainDialog.Hide()
@@ -238,7 +238,7 @@ func showStakingPage(creds Credentials) {
 				// defer close(stopChan) when you need to ensure it gets closed properly.
 
 				// Send the transaction
-				SendTransaction(txHex, creds, handleSuccess, handleFailure)
+				SendTransaction(txHex, creds)
 
 			})
 			cancelButton := widget.NewButton("Maybe later", func() {
@@ -404,7 +404,7 @@ func showStakingPage(creds Credentials) {
 					// defer close(stopChan) when you need to ensure it gets closed properly.
 
 					// Send the transaction
-					SendTransaction(txHex, creds, handleSuccess, handleFailure)
+					SendTransaction(txHex, creds)
 
 				})
 				cancelButton := widget.NewButton("Maybe later", func() {
@@ -456,7 +456,7 @@ func showStakingPage(creds Credentials) {
 					// defer close(stopChan) when you need to ensure it gets closed properly.
 
 					// Send the transaction
-					SendTransaction(txHex, creds, handleSuccess, handleFailure)
+					SendTransaction(txHex, creds)
 				})
 				cancelButton := widget.NewButton("Maybe later", func() {
 					currentMainDialog.Hide()
@@ -530,7 +530,7 @@ func showStakingPage(creds Credentials) {
 			// defer close(stopChan) when you need to ensure it gets closed properly.
 
 			// Send the transaction
-			SendTransaction(txHex, creds, handleSuccess, handleFailure)
+			SendTransaction(txHex, creds)
 		})
 		cancelButton := widget.NewButton("Maybe later", func() {
 			currentMainDialog.Hide()
@@ -627,7 +627,7 @@ func showStakingPage(creds Credentials) {
 			// defer close(stopChan) when you need to ensure it gets closed properly.
 
 			// Send the transaction
-			SendTransaction(txHex, creds, handleSuccess, handleFailure)
+			SendTransaction(txHex, creds)
 		})
 		cancelButton := widget.NewButton("Maybe later", func() {
 			currentMainDialog.Hide()
