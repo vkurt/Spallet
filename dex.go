@@ -1399,7 +1399,8 @@ func executeSwap(route []TransactionDataForDex, slippageTolerance float64, creds
 		fmt.Printf("2. amountIn: %s (%s)\n", tx.AmountIn.String(), tx.TokenIn)
 		fmt.Printf("3. tokenIn: %s\n", tx.TokenIn)
 		fmt.Printf("4. tokenOut: %s\n", tx.TokenOut)
-		fmt.Printf("5. slippageTolerance: %d basis points\n", slippageBasisPoints)
+		fmt.Printf("5. amountOut: %s (%s)\n", tx.AmountOut.String(), tx.TokenOut)
+		fmt.Printf("6. slippageTolerance: %d basis points\n", slippageBasisPoints)
 
 		sb.CallContract("SATRN", "swap",
 			wallet.Address,      // from

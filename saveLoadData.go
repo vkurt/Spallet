@@ -44,7 +44,7 @@ var defaultSettings = WalletSettings{
 	ChainName:          "main",
 	DefaultGasLimit:    big.NewInt(10000),
 	GasLimitSliderMax:  100000,
-	GasLimitSliderMin:  10000,
+	GasLimitSliderMin:  5000,
 	GasPrice:           big.NewInt(100000),
 	TxExplorerLink:     "https://explorer.phantasma.info/en/transaction?id=",
 	AccExplorerLink:    "https://explorer.phantasma.info/en/address?id=",

@@ -57,7 +57,7 @@ func showStakingPage(creds Credentials) {
 				sb.CallContract("stake", "Claim", from, from)
 				sb.SpendGas(keyPair.Address().String())
 				script := sb.EndScript()
-				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
+				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("Spallet Spark Collect"))
 				tx.Sign(keyPair)
 				txHex := hex.EncodeToString(tx.Bytes())
 				// Start the animation
@@ -73,7 +73,8 @@ func showStakingPage(creds Credentials) {
 				currentMainDialog.Hide()
 			})
 			kcalDiaButtonContainer := container.New(layout.NewCenterLayout())
-			diaLockWarning := widget.NewLabelWithStyle("Dont forget brother/sister after forging Specky needs to rest his Soul for\n24h and your clan need to wait untill it recovers", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+			diaLockWarning := widget.NewLabelWithStyle("⚠️Dont forget after forging Specky needs to rest his Soul for 24h and your clan need to wait untill it recovers.", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+			diaLockWarning.Wrapping = fyne.TextWrapWord
 			kcalDiaButtons := container.NewHBox(cancelButton, confirmButton)
 			kcalDiaButtonContainer.Objects = []fyne.CanvasObject{kcalDiaButtons}
 			kcalClaimDiaRemained := remainedTimeForKcalGenLabel
@@ -150,7 +151,7 @@ func showStakingPage(creds Credentials) {
 				sb.CallContract("stake", "Stake", from, amount.String())
 				sb.SpendGas(keyPair.Address().String())
 				script := sb.EndScript()
-				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
+				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("Spallet Soul Power Up"))
 				tx.Sign(keyPair)
 				txHex := hex.EncodeToString(tx.Bytes())
 				// Start the animation
@@ -228,7 +229,7 @@ func showStakingPage(creds Credentials) {
 				sb.CallContract("stake", "Unstake", from, amount.String())
 				sb.SpendGas(keyPair.Address().String())
 				script := sb.EndScript()
-				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
+				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("Spallet Soul Drain"))
 				tx.Sign(keyPair)
 				txHex := hex.EncodeToString(tx.Bytes())
 				// Start the animation
@@ -520,7 +521,7 @@ func showStakingPage(creds Credentials) {
 			sb.CallContract("stake", "MasterClaim", from)
 			sb.SpendGas(keyPair.Address().String())
 			script := sb.EndScript()
-			tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
+			tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("Spallet Master's Bounty Distribution"))
 			tx.Sign(keyPair)
 			txHex := hex.EncodeToString(tx.Bytes())
 			// Start the animation
@@ -598,26 +599,24 @@ func showStakingPage(creds Credentials) {
 
 	// ******Crown things
 	crwnRwrdButton := widget.NewButton("Forge the Crowns", func() {
-
-		crwnRwrdConfirmLabel := widget.NewLabel("The time has come to forge the legendary Crowns, living entities imbued with ancient secrets and powers. By forging these Crowns eligible Masters will gain extraordinary abilities. Remember if they choose to unlock the Crowns’ secrets through sacrifice, the gained powers will be lost.\nAre you ready to honor our champions with these mystical gifts?")
+		crownForgeFeeLimit := new(big.Int).Mul(stakeFeeLimit, big.NewInt(10))
+		crwnRwrdConfirmLabel := widget.NewLabel("The time has come to forge the legendary Crowns, living entities imbued with ancient secrets and powers. By forging these Crowns eligible Masters will gain extraordinary abilities. Remember if they choose to unlock the Crowns’ secrets through sacrifice, the gained powers will be lost.\nAre you ready to honor our champions with these mystical gifts?\n")
 		crwnRwrdConfirmLabel.Wrapping = fyne.TextWrapWord
 		confirmButton := widget.NewButton("This is the way", func() {
 			keyPair, err := cryptography.FromWIF(creds.Wallets[creds.LastSelectedWallet].WIF)
 			if err != nil {
-				fyne.CurrentApp().SendNotification(&fyne.Notification{
-					Title:   "Transaction Failed",
-					Content: fmt.Sprintf("Invalid WIF: %v", err),
-				})
+				dialog.ShowError(fmt.Errorf("invalid WIF: %v", err), mainWindowGui)
 				return
 			}
+
 			from := keyPair.Address().String()
 			expire := time.Now().UTC().Add(time.Second * 300).Unix()
 			sb := scriptbuilder.BeginScript()
-			sb.AllowGas(from, cryptography.NullAddress().String(), userSettings.GasPrice, stakeFeeLimit)
+			sb.AllowGas(from, cryptography.NullAddress().String(), userSettings.GasPrice, crownForgeFeeLimit)
 			sb.CallContract("gas", "ApplyInflation", from)
 			sb.SpendGas(keyPair.Address().String())
 			script := sb.EndScript()
-			tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
+			tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("Spallet Crown Forging"))
 			tx.Sign(keyPair)
 			txHex := hex.EncodeToString(tx.Bytes())
 			// Start the animation
@@ -632,12 +631,22 @@ func showStakingPage(creds Credentials) {
 		cancelButton := widget.NewButton("Maybe later", func() {
 			currentMainDialog.Hide()
 		})
+		crownFeeWarning := widget.NewLabelWithStyle("", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+		crownFeeWarning.Wrapping = fyne.TextWrapWord
 		crwnRwrdDiaButtonContainer := container.New(layout.NewCenterLayout())
+		feeErr := checkFeeBalance(new(big.Int).Mul(userSettings.GasPrice, crownForgeFeeLimit))
+		if crownForgeFeeLimit.Cmp(big.NewInt(100000)) < 0 {
+			crownFeeWarning.Text = "⚠️Your Default Fee Limit is too low for forging Crowns!\nMin 10 000"
+			confirmButton.Disable()
+		} else if feeErr != nil {
+			crownFeeWarning.Text = fmt.Sprintf("⚠️You dont have enough Kcal for Specky, forging Crows needs more energy than usual.\n%v", feeErr)
+			confirmButton.Disable()
+		}
 
 		crwnRwrdDiaButtons := container.NewHBox(cancelButton, confirmButton)
 		crwnRwrdDiaButtonContainer.Objects = []fyne.CanvasObject{crwnRwrdDiaButtons}
 
-		crwnRwrdConfirmDialog := container.NewBorder(nil, crwnRwrdDiaButtonContainer, nil, nil, container.NewVBox(crwnRwrdConfirmLabel))
+		crwnRwrdConfirmDialog := container.NewBorder(nil, crwnRwrdDiaButtonContainer, nil, nil, container.NewVBox(crwnRwrdConfirmLabel, crownFeeWarning))
 		d := dialog.NewCustomWithoutButtons("Forge Crowns", crwnRwrdConfirmDialog, mainWindowGui)
 		d.Resize(fyne.NewSize(660, 300))
 		currentMainDialog = d

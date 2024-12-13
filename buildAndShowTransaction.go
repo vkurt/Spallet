@@ -158,24 +158,46 @@ func displayTransactions(transactions []TransactionResult, totalPages uint, addr
 
 		for _, tx := range txGroup {
 			var txType string
-			var hasIncoming, hasOutgoing, hasExchange, isFaulty, isTokenMint, isLiquidity bool
-
+			var hasIncoming, hasOutgoing, hasExchange, isTokenMint, isLiquidity, isKcalClaim, isSoulStake, isSoulUnstake, isSoulMasterReward bool
+			// fmt.Printf("-Events for %v\n", tx.Hash)
 			for _, event := range tx.Events {
+				// if tx.Hash == "BB889CF449627622AB6B3F75667BDF54A6A1C2D07AD38C63BEA2DEEA286302EF" {
+				// 	eventData := hexToASCII(event.Data)
+				// 	fmt.Printf("Event\n\tkind %v\n\tcontract %v\n\taddress %v\n\tdata %v\n", event.Kind, event.Contract, event.Address, eventData)
+				// }
+
+				// if event.Kind == "ExecutionFailure" {
+
+				// 	isFaulty = true
+
+				// }
+
 				if event.Kind == "TokenSend" && event.Address == address {
 					hasOutgoing = true
 				} else if event.Kind == "TokenReceive" && event.Address == address {
 					hasIncoming = true
 
-				} else if event.Kind == "TokenMint" {
-					isTokenMint = true
 				} else if event.Kind == "TokenMint" && event.Contract == "SATRN" && event.Address == address { // not sure it can catch liq mintings but at least tried
 					isLiquidity = true
-					hasExchange = false
-					// fmt.Println("found liq mint tx")
-					break
-				} else if event.Contract == "SATRN" { // if event contract is Saturn i am acceping it as Exchange tx but not always correct
+					// hasExchange = false
+					// // fmt.Println("found liq mint tx")
+					// break
+				} else if event.Kind == "TokenMint" && event.Contract == "stake" {
+					isKcalClaim = true
+					// isTokenMint = false
+					// break
+
+				} else if event.Kind == "TokenMint" {
+					isTokenMint = true
+				} else if event.Kind == "TokenStake" && event.Contract == "SATRN" { // if event contract is Saturn i am acceping it as Exchange tx but not always correct
 					hasExchange = true
 
+				} else if event.Kind == "TokenStake" && event.Contract == "stake" {
+					isSoulStake = true
+				} else if event.Kind == "TokenClaim" && event.Contract == "stake" {
+					isSoulUnstake = true
+				} else if event.Kind == "MasterClaim" {
+					isSoulMasterReward = true
 				}
 
 				// eventData := hexToASCII(event.Data)
@@ -193,27 +215,28 @@ func displayTransactions(transactions []TransactionResult, totalPages uint, addr
 				// 	fmt.Println("Log data: ", data)
 				// }
 
-				if event.Kind == "ExecutionFailure" {
-
-					isFaulty = true
-
-				}
 			}
 
-			if hasExchange {
+			if hasExchange && !isLiquidity {
 				txType = "Exchange"
 			} else if hasIncoming {
 				txType = "Incoming"
 			} else if hasOutgoing {
 				txType = "Outgoing"
-			} else if isFaulty {
-				txType = "Faulty"
 			} else if isLiquidity {
 				txType = "Liquidity"
-			} else if isTokenMint {
+			} else if isTokenMint && !isKcalClaim {
 				txType = "Minting"
+			} else if isKcalClaim && !isSoulMasterReward {
+				txType = "Collecting"
+			} else if isSoulStake {
+				txType = "Staking"
+			} else if isSoulUnstake && !isSoulMasterReward {
+				txType = "Unstaking"
+			} else if isSoulMasterReward {
+				txType = "SmReward"
 			} else {
-				txType = "WTFisThis"
+				txType = "Unknown"
 			}
 
 			txState := "Failed"
