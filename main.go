@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"math/big"
 	"net/url"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
@@ -17,9 +19,10 @@ import (
 )
 
 type Wallet struct {
-	Name    string `json:"name"`
-	Address string `json:"address"`
-	WIF     string `json:"wif"`
+	Name     string `json:"name"`
+	Address  string `json:"address"`
+	WIF      string `json:"wif"`
+	Mnemonic string `json:"mnemonic"`
 }
 
 type Credentials struct {
@@ -160,12 +163,47 @@ func showExistingUserLogin() {
 	// stopBadgeAnimation()
 
 	passwordEntry := widget.NewPasswordEntry()
+	invalidPwdMessage := binding.NewString()
+	invalidPasswordLabel := widget.NewLabelWithData(invalidPwdMessage)
+	resetWalletBtn := widget.NewButton("Forgot Your Password ?", func() {
+		var pwdForgotDia dialog.Dialog
+		closeBtn := widget.NewButtonWithIcon("", theme.WindowCloseIcon(), func() { pwdForgotDia.Hide() })
+		confirmBtn := widget.NewButtonWithIcon("", theme.ConfirmIcon(), func() { showPasswordSetupPage(); pwdForgotDia.Hide() })
+		forgetKeysMessage := widget.NewRichTextFromMarkdown("Uh-oh, it seems your password has gone on a moon mission without you! 🚀🔑\n\nWe can't recover it now told you to keep it safe! But if you're ready to start fresh, type **'confirm'** below, and we'll hit the reset button like a crypto market crash.\n\n**⚠️ Warning: This will wipe all your accounts cleaner than a new block on the blockchain.**\n\n ***P.S. This time, guard your password like your most precious crypto. 🛡️***")
+		forgetKeysMessage.Wrapping = fyne.TextWrapWord
+		confirmEntry := widget.NewEntry()
+		confirmEntry.Validator = func(s string) error {
+			if s == "confirm" {
+				confirmBtn.Enable()
+				return nil
+			} else {
+				confirmBtn.Disable()
+				return fmt.Errorf("please write confirm")
+			}
+		}
+		confirmEntry.SetPlaceHolder("Please Write 'confirm'")
+		btns := container.NewGridWithColumns(2, closeBtn, confirmBtn)
+		content := container.NewBorder(nil, btns, nil, nil, container.NewVBox(forgetKeysMessage, confirmEntry))
+		pwdForgotDia = dialog.NewCustomWithoutButtons("Forgot Your Password ?", content, mainWindowGui)
+		pwdForgotDia.Resize(fyne.NewSize(720, 405))
+		pwdForgotDia.Show()
+	})
+	invalidPasswordLabel.TextStyle = fyne.TextStyle{Bold: true}
+	resetWalletBtn.Hide()
+	invalidPasswordLabel.Hide()
+
 	logIn := func() {
 		rawPassword := passwordEntry.Text
 
 		creds, err := loadCredentials("data/essential/credentials.spallet", rawPassword)
 		if err != nil {
-			dialog.ShowInformation("Error", "Failed to load credentials: "+err.Error(), mainWindowGui)
+			if strings.Contains(err.Error(), "cipher: message authentication failed") {
+				invalidPasswordLabel.Show()
+				resetWalletBtn.Show()
+				invalidPwdMessage.Set("Invalid Password!")
+			} else {
+				invalidPwdMessage.Set(err.Error())
+			}
 			return
 		} else if creds.Password == rawPassword {
 			ldAddrBk, err := loadAddressBook("data/essential/addressbook.spallet", rawPassword)
@@ -242,12 +280,16 @@ func showExistingUserLogin() {
 		logIn()
 	}
 
+	pwdHeader := widget.NewLabel("Enter your password")
+	pwdHeader.Alignment = fyne.TextAlignCenter
 	logInCont := container.NewVBox(
-		widget.NewLabel("Enter Password:"),
+		pwdHeader,
 		passwordEntry,
 		widget.NewButton("Login", func() {
 			logIn()
-		}))
+		}),
+		invalidPasswordLabel,
+		resetWalletBtn)
 	logInCont.Resize(fyne.NewSize(400, 150))
 	logInLyt := container.New(layout.NewCenterLayout())
 	logInLyt.Objects = []fyne.CanvasObject{

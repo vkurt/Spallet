@@ -18,8 +18,6 @@ import (
 
 // Function to show Welcome Page
 func showWelcomePage() {
-	loadSettings("data/essential/settings.spallet")
-	updateOrCheckCache("", 3, "chain")
 
 	welcomeMsg := widget.NewLabelWithStyle("Welcome to Spallet!", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 	humorousMsg := widget.NewLabel("So, you’ve got the soul of a crypto warrior, huh? Whether you’re riding the waves with Specky👻 or Sparky🔥, this wallet is your trusty companion in the Phantasma universe. 🐦⚡")
@@ -72,6 +70,7 @@ func featuresPage() {
 
 // Function to show Password Setup Page
 func showPasswordSetupPage() {
+
 	pwdFrst := ""
 	pwdBind := binding.BindString(&pwdFrst)
 	passwordEntry := widget.NewEntryWithData(pwdBind)
@@ -364,12 +363,20 @@ func showWalletSetupPage(creds Credentials) {
 
 							restoreDia.Hide()
 							showUpdatingDialog()
+							err := getChainStatistics()
+							if err == nil {
+								updateOrCheckCache("", 3, "chain")
+								dataFetch(creds)
+								mainWindow(creds)
+								closeUpdatingDialog()
+								dialog.ShowInformation("Found new data", restoreInfo, mainWindowGui)
+								startLogoutTicker(userSettings.LgnTmeOut)
+								autoUpdate(updateInterval, creds)
 
-							dataFetch(creds)
-							mainWindow(creds)
-							closeUpdatingDialog()
-							dialog.ShowInformation("Found new data", restoreInfo, mainWindowGui)
-							startLogoutTicker(15)
+							} else {
+								dialog.ShowError(err, mainWindowGui)
+								return
+							}
 
 						} else {
 
@@ -432,32 +439,11 @@ func generateNewWalletPage(creds Credentials) {
 		}
 		creds.WalletOrder = append(creds.WalletOrder, nameEntry.Text)
 		creds.LastSelectedWallet = nameEntry.Text
-		if err := saveCredentials(creds); err != nil {
-			log.Println("Failed to save credentials:", err)
-			dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
+
+		err := startWallet(creds)
+		if err != nil {
 			return
 		}
-
-		userSettings = defaultSettings
-
-		if err := saveSettings(); err != nil {
-			log.Println("Failed to save Settings:", err)
-			dialog.ShowInformation("Error", "Failed to save Settings: "+err.Error(), mainWindowGui)
-			return
-		}
-
-		if err := saveAddressBook(userAddressBook, creds.Password); err != nil {
-			log.Println("Failed to save Addressbook:", err)
-			dialog.ShowInformation("Error", "Failed to save Addressbook: "+err.Error(), mainWindowGui)
-			return
-		}
-
-		showUpdatingDialog()
-
-		dataFetch(creds)
-		mainWindow(creds)
-		closeUpdatingDialog()
-		startLogoutTicker(15)
 
 	})
 	okButton.Disable() // Initially disable the Continue button
@@ -535,32 +521,11 @@ func showImportWifPage(creds Credentials) {
 		}
 		creds.WalletOrder = append(creds.WalletOrder, walletName)
 		creds.LastSelectedWallet = walletName
-		if err := saveCredentials(creds); err != nil {
-			log.Println("Failed to save credentials:", err)
-			dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
+
+		err = startWallet(creds)
+		if err != nil {
 			return
 		}
-
-		userSettings = defaultSettings
-
-		if err := saveSettings(); err != nil {
-			log.Println("Failed to save Settings:", err)
-			dialog.ShowInformation("Error", "Failed to save Settings: "+err.Error(), mainWindowGui)
-			return
-		}
-
-		if err := saveAddressBook(userAddressBook, creds.Password); err != nil {
-			log.Println("Failed to save Addressbook:", err)
-			dialog.ShowInformation("Error", "Failed to save Addressbook: "+err.Error(), mainWindowGui)
-			return
-		}
-		showUpdatingDialog()
-
-		dataFetch(creds)
-		mainWindow(creds)
-		closeUpdatingDialog()
-		startLogoutTicker(15)
-
 	})
 	importButton.Disabled()
 	wifEntryForm := widget.NewForm(
@@ -622,4 +587,45 @@ func showImportWifPage(creds Credentials) {
 	mainWindowGui.SetContent(importWifLyt)
 	mainWindowGui.Canvas().Focus(walletNameEntry)
 
+}
+
+func startWallet(creds Credentials) error {
+	if err := saveCredentials(creds); err != nil {
+		log.Println("Failed to save credentials:", err)
+		dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
+		return err
+	}
+	if !fileExists("data/essential/settings.spallet") {
+		userSettings = defaultSettings
+
+		if err := saveSettings(); err != nil {
+			log.Println("Failed to save Settings:", err)
+			dialog.ShowInformation("Error", "Failed to save Settings: "+err.Error(), mainWindowGui)
+			return err
+		}
+
+	} else {
+		loadSettings("data/essential/settings.spallet")
+	}
+
+	if err := saveAddressBook(userAddressBook, creds.Password); err != nil {
+		log.Println("Failed to save Addressbook:", err)
+		dialog.ShowInformation("Error", "Failed to save Addressbook: "+err.Error(), mainWindowGui)
+		return err
+	}
+
+	showUpdatingDialog()
+	err := getChainStatistics()
+	if err != nil {
+		dialog.ShowError(err, mainWindowGui)
+		return err
+	} else {
+		updateOrCheckCache("", 3, "chain")
+		dataFetch(creds)
+		mainWindow(creds)
+		closeUpdatingDialog()
+		startLogoutTicker(userSettings.LgnTmeOut)
+		autoUpdate(updateInterval, creds)
+	}
+	return nil
 }
