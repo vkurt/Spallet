@@ -232,7 +232,7 @@ func manageAccountsDia(creds Credentials) {
 					}))
 					if mnemonic == "" {
 						mnemonicFormItem.Widget.Hide()
-						mnemonicFormItem.Widget = widget.NewLabel("Not entered")
+						mnemonicFormItem.Text = ""
 					}
 					dialog.ShowCustom("Please dont share this info with anyone", "I'll be careful with this", container.NewVBox(
 						widget.NewForm(
