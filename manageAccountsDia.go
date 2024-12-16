@@ -348,7 +348,7 @@ func manageAccountsDia(creds Credentials) {
 									sb.SpendGas(keyPair.Address().String())
 									script := sb.EndScript()
 
-									tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("test"))
+									tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Account Migration"))
 									tx.Sign(keyPair)
 									txHex := hex.EncodeToString(tx.Bytes())
 									// fmt.Println("*****Tx: \n" + txHex)
@@ -543,7 +543,7 @@ func manageAccountsDia(creds Credentials) {
 								sb.SpendGas(keyPair.Address().String())
 								script := sb.EndScript()
 
-								tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("test"))
+								tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Account Migration"))
 								tx.Sign(keyPair)
 								txHex := hex.EncodeToString(tx.Bytes())
 								// fmt.Println("*****Tx: \n" + txHex)
@@ -742,7 +742,7 @@ func manageAccountsDia(creds Credentials) {
 									sb.SpendGas(keyPair.Address().String())
 									script := sb.EndScript()
 
-									tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("test"))
+									tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Account Migration"))
 									tx.Sign(keyPair)
 									txHex := hex.EncodeToString(tx.Bytes())
 									// fmt.Println("*****Tx: \n" + txHex)
