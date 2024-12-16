@@ -68,7 +68,7 @@ func sendNFTTransaction(WIF string, nftsToSend map[string][]string, to string, c
 	}
 	sb.SpendGas(keyPair.Address().String())
 	script := sb.EndScript()
-	tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
+	tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Transfer"))
 	tx.Sign(keyPair)
 	txHex := hex.EncodeToString(tx.Bytes())
 	// fmt.Println("Tx: " + txHex)

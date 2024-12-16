@@ -836,7 +836,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 				foundBestRoute, txData, impact, route, poolCount, estOutAmount, err := evaluateRoutes(swapRoutes, tokenInSelect.Selected, latestDexPools.PoolList, inAmount, currentDexSlippage, currentDexRouteEvaluation)
 
 				bestRoute = foundBestRoute
-				dexPayload = "Spallet Swap " + route
+				dexPayload = mainPayload + " Swap " + route
 				var routeFee *big.Int
 				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), currentDexBaseFeeLimit)
 				if tokenInSelect.Selected == "KCAL" {
@@ -939,7 +939,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 
 				var routeFee *big.Int
 				bestRoute = foundBestRoute
-				dexPayload = "Spallet Swap " + route
+				dexPayload = mainPayload + " Swap " + route
 				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), currentDexBaseFeeLimit)
 
 				if tokenInSelect.Selected == "KCAL" {
@@ -1100,7 +1100,7 @@ func createDexContent(creds Credentials) *container.Scroll {
 
 				var routeFee *big.Int
 				bestRoute = foundBestRoute
-				dexPayload = "Spallet Swap " + route
+				dexPayload = mainPayload + " Swap " + route
 				currentDexFeeLimit.Mul(big.NewInt(int64(poolCount)), currentDexBaseFeeLimit)
 
 				if tokenInSelect.Selected == "KCAL" {

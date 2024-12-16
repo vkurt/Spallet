@@ -61,7 +61,7 @@ var kcalProdRate = 0.002
 
 var pageSize = uint(25)
 var page = uint(1)
-var payload = []byte("Spallet")
+var mainPayload = "Spallet"
 
 func main() {
 

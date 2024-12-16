@@ -57,7 +57,7 @@ func showStakingPage(creds Credentials) {
 				sb.CallContract("stake", "Claim", from, from)
 				sb.SpendGas(keyPair.Address().String())
 				script := sb.EndScript()
-				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("Spallet Spark Collect"))
+				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Spark Collecting"))
 				tx.Sign(keyPair)
 				txHex := hex.EncodeToString(tx.Bytes())
 				// Start the animation
@@ -151,7 +151,7 @@ func showStakingPage(creds Credentials) {
 				sb.CallContract("stake", "Stake", from, amount.String())
 				sb.SpendGas(keyPair.Address().String())
 				script := sb.EndScript()
-				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("Spallet Soul Power Up"))
+				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Soul Power Up"))
 				tx.Sign(keyPair)
 				txHex := hex.EncodeToString(tx.Bytes())
 				// Start the animation
@@ -229,7 +229,7 @@ func showStakingPage(creds Credentials) {
 				sb.CallContract("stake", "Unstake", from, amount.String())
 				sb.SpendGas(keyPair.Address().String())
 				script := sb.EndScript()
-				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("Spallet Soul Drain"))
+				tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Soul Drain"))
 				tx.Sign(keyPair)
 				txHex := hex.EncodeToString(tx.Bytes())
 				// Start the animation
@@ -395,7 +395,7 @@ func showStakingPage(creds Credentials) {
 					sb.CallContract("account", "RegisterName", from, registerNameEntry.Text)
 					sb.SpendGas(keyPair.Address().String())
 					script := sb.EndScript()
-					tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
+					tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Name Forging"))
 					tx.Sign(keyPair)
 					txHex := hex.EncodeToString(tx.Bytes())
 					// Start the animation
@@ -447,7 +447,7 @@ func showStakingPage(creds Credentials) {
 					sb.CallContract("account", "RegisterName", from, registerNameEntry.Text)
 					sb.SpendGas(keyPair.Address().String())
 					script := sb.EndScript()
-					tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), payload)
+					tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Name Reforging"))
 					tx.Sign(keyPair)
 					txHex := hex.EncodeToString(tx.Bytes())
 					// Start the animation
@@ -521,7 +521,7 @@ func showStakingPage(creds Credentials) {
 			sb.CallContract("stake", "MasterClaim", from)
 			sb.SpendGas(keyPair.Address().String())
 			script := sb.EndScript()
-			tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("Spallet Master's Bounty Distribution"))
+			tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Master's Bounty Distribution"))
 			tx.Sign(keyPair)
 			txHex := hex.EncodeToString(tx.Bytes())
 			// Start the animation
@@ -616,7 +616,7 @@ func showStakingPage(creds Credentials) {
 			sb.CallContract("gas", "ApplyInflation", from)
 			sb.SpendGas(keyPair.Address().String())
 			script := sb.EndScript()
-			tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte("Spallet Crown Forging"))
+			tx := blockchain.NewTransaction(userSettings.NetworkName, userSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Crown Forging"))
 			tx.Sign(keyPair)
 			txHex := hex.EncodeToString(tx.Bytes())
 			// Start the animation
