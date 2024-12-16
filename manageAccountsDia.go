@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"regexp"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -18,6 +18,7 @@ import (
 	"github.com/phantasma-io/phantasma-go/pkg/blockchain"
 	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
 	scriptbuilder "github.com/phantasma-io/phantasma-go/pkg/vm/script_builder"
+	"github.com/tyler-smith/go-bip39"
 )
 
 func manageAccountsDia(creds Credentials) {
@@ -223,11 +224,26 @@ func manageAccountsDia(creds Credentials) {
 				})
 
 				showKeyButton := widget.NewButtonWithIcon("", theme.WarningIcon(), func() {
+					mnemonic := wallet.Mnemonic
+					mnemonicBtnText := formatMnemonic(mnemonic)
+					mnemonicFormItem := widget.NewFormItem("Seed Phrase", widget.NewButtonWithIcon(mnemonicBtnText, theme.ContentCopyIcon(), func() {
+						fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(mnemonic)
+						dialog.ShowInformation("Copied", "Seed Phrase copied to the clipboard", mainWindowGui)
+					}))
+					if mnemonic == "" {
+						mnemonicFormItem.Widget.Hide()
+						mnemonicFormItem.Widget = widget.NewLabel("Not entered")
+					}
 					dialog.ShowCustom("Please dont share this info with anyone", "I'll be careful with this", container.NewVBox(
-						widget.NewForm(widget.NewFormItem("Name", widget.NewLabel(wallet.Name)), widget.NewFormItem("Address", widget.NewLabel(wallet.Address)), widget.NewFormItem("Wif", widget.NewButtonWithIcon(creds.Wallets[walletName].WIF, theme.ContentCopyIcon(), func() {
-							fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(creds.Wallets[walletName].WIF)
-							dialog.ShowInformation("Copied", "Wif copied to the clipboard", mainWindowGui)
-						}))),
+						widget.NewForm(
+							widget.NewFormItem("Name", widget.NewLabel(wallet.Name)),
+							widget.NewFormItem("Address", widget.NewLabel(wallet.Address)),
+							widget.NewFormItem("Wif", widget.NewButtonWithIcon(creds.Wallets[walletName].WIF, theme.ContentCopyIcon(), func() {
+								fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(creds.Wallets[walletName].WIF)
+								dialog.ShowInformation("Copied", "Wif copied to the clipboard", mainWindowGui)
+							})),
+							mnemonicFormItem,
+						),
 					), mainWindowGui)
 				})
 
@@ -448,7 +464,24 @@ func manageAccountsDia(creds Credentials) {
 							migToGenSep2 := widget.NewSeparator()
 							migToGenSep3 := widget.NewSeparator()
 							migToGenSep4 := widget.NewSeparator()
-							genKeyPair := cryptography.GeneratePhantasmaKeys()
+
+							entropy, err := bip39.NewEntropy(defaultMnemonicEntropy)
+							if err != nil {
+								dialog.ShowError(err, mainWindowGui)
+								return
+							} // Generate the mnemonic phrase
+							mnemonic, err := bip39.NewMnemonic(entropy)
+							if err != nil {
+								dialog.ShowError(err, mainWindowGui)
+								return
+							}
+							pk, err := mnemonicToPk(mnemonic, 0)
+							if err != nil {
+								dialog.ShowError(err, mainWindowGui)
+								return
+							}
+							genKeyPair := cryptography.NewPhantasmaKeys(pk)
+
 							genPrivateKey := genKeyPair.WIF()
 							genAddress := genKeyPair.Address().String()
 							migToGenNameSuggest := "Dest. Account " + fmt.Sprint(len(creds.Wallets)+1)
@@ -461,14 +494,19 @@ func manageAccountsDia(creds Credentials) {
 							toLabel := widget.NewLabelWithStyle("Destination Account", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 							genAccNameBind := binding.BindString(&migToGenNameSuggest)
 							genAccNameEntry := widget.NewEntryWithData(genAccNameBind)
+							seedCopyBtnTxt := formatMnemonic(mnemonic)
 							toGenAccForm := widget.NewForm(
 								widget.NewFormItem("Name", genAccNameEntry),
 								widget.NewFormItem("Address", widget.NewLabel(genAddress)),
-								widget.NewFormItem("Private Key", widget.NewButtonWithIcon(genPrivateKey, theme.ContentCopyIcon(), func() {
+								widget.NewFormItem("Private Key (Wif)", widget.NewButtonWithIcon(genPrivateKey, theme.ContentCopyIcon(), func() {
 									fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(genPrivateKey)
 									dialog.ShowInformation("Copied", "Private Key (wif) copied to the clipboard", mainWindowGui)
-								},
-								)))
+								})),
+								widget.NewFormItem("Seed Phrase", widget.NewButtonWithIcon(seedCopyBtnTxt, theme.ContentCopyIcon(), func() {
+									fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(mnemonic)
+									dialog.ShowInformation("Copied", "Seed Phrase copied to the clipboard", mainWindowGui)
+								})),
+							)
 
 							migToGenWarnig := widget.NewLabelWithStyle("After confirming Specky will start moving your assets", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
@@ -485,9 +523,10 @@ func manageAccountsDia(creds Credentials) {
 
 								name, _ := genAccNameBind.Get()
 								creds.Wallets[name] = Wallet{
-									Name:    name,
-									Address: genAddress,
-									WIF:     genPrivateKey,
+									Name:     name,
+									Address:  genAddress,
+									WIF:      genPrivateKey,
+									Mnemonic: mnemonic,
 								}
 								creds.WalletOrder = append(creds.WalletOrder, name)
 								creds.LastSelectedWallet = name
@@ -621,7 +660,7 @@ func manageAccountsDia(creds Credentials) {
 							migToKeycSep3 := widget.NewSeparator()
 							migToKeycSep4 := widget.NewSeparator()
 							migToKeyPrvKey := widget.NewEntry()
-							migToKeyPrvKey.PlaceHolder = "Enter your wif"
+							migToKeyPrvKey.PlaceHolder = "Enter your wif or seed phrase"
 							migToKeyNameFrst := ""
 							migToKeyNameBind := binding.BindString(&migToKeyNameFrst)
 							migToKeyNameEntry := widget.NewEntryWithData(migToKeyNameBind)
@@ -631,14 +670,26 @@ func manageAccountsDia(creds Credentials) {
 							warningFrst := ""
 							warning := binding.BindString(&warningFrst)
 							warningLabel := widget.NewLabelWithData(warning)
-							nameErr, prvKeyErr := false, false
-
+							nameErr, prvKeyErr, isSeed := false, false, false
+							mnemonic := ""
 							migToKeyCntBttn := widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() {
-
-								migToKeyPair, err := cryptography.FromWIF(migToKeyPrvKey.Text)
-								if err != nil {
-									dialog.ShowInformation("Error", "Invalid WIF format", mainWindowGui)
-									return
+								var migToKeyPair cryptography.PhantasmaKeys
+								entry := strings.TrimSpace(migToKeyPrvKey.Text)
+								if isSeed {
+									mnemonic = entry
+									pk, err := mnemonicToPk(mnemonic, 0)
+									if err != nil {
+										dialog.ShowError(err, mainWindowGui)
+										return
+									}
+									migToKeyPair = cryptography.NewPhantasmaKeys(pk)
+								} else {
+									var err error
+									migToKeyPair, err = cryptography.FromWIF(entry)
+									if err != nil {
+										dialog.ShowInformation("Error", "Invalid WIF format", mainWindowGui)
+										return
+									}
 								}
 
 								migToKeyAddress := migToKeyPair.Address().String()
@@ -650,7 +701,7 @@ func manageAccountsDia(creds Credentials) {
 								}
 								stakedBalance := StringToBigInt(response.Stakes.Amount)
 								if stakedBalance.Cmp(big.NewInt(0)) > 0 {
-									dialog.ShowError(fmt.Errorf("you have staked Soul in entered Wif account"), mainWindowGui)
+									dialog.ShowError(fmt.Errorf("you have staked Soul in destination account"), mainWindowGui)
 									return
 								}
 
@@ -671,9 +722,10 @@ func manageAccountsDia(creds Credentials) {
 									}
 
 									creds.Wallets[migToKeyNameEntry.Text] = Wallet{
-										Name:    migToKeyNameEntry.Text,
-										Address: migToKeyAddress,
-										WIF:     migToKeyPair.WIF(),
+										Name:     migToKeyNameEntry.Text,
+										Address:  migToKeyAddress,
+										WIF:      migToKeyPair.WIF(),
+										Mnemonic: mnemonic,
 									}
 									creds.WalletOrder = append(creds.WalletOrder, migToKeyNameEntry.Text)
 									creds.LastSelectedWallet = migToKeyNameEntry.Text
@@ -768,56 +820,40 @@ func manageAccountsDia(creds Credentials) {
 									migToKeyCntBttn.Disable()
 								}
 							}
+
 							migToKeyPrvKey.Validator = func(s string) error {
-								noSpaces := !regexp.MustCompile(`\s`).MatchString(s)
-								matched, _ := regexp.MatchString("^[KL5][a-zA-Z0-9]{0,51}$", s)
-
-								if len(s) < 1 {
-									warning.Set("Please enter wif")
-									prvKeyErr = true
-									updatemigToKeyCntBttnStat()
-									return errors.New("please enter wif")
-								} else if len(s) < 52 {
-									if !noSpaces {
-
-										warning.Set("Wif can't contain spaces")
+								s = strings.TrimSpace(s)
+								containsSpace := strings.Contains(s, " ")
+								if containsSpace {
+									err := seedPhraseValidator(s)
+									if err != nil {
+										warning.Set(err.Error())
 										prvKeyErr = true
+										isSeed = true
 										updatemigToKeyCntBttnStat()
-										return errors.New("wif can't contain spaces")
-									} else if !matched {
-										prvKeyErr = true
-										updatemigToKeyCntBttnStat()
-										warning.Set("Wif can't contain special characters and must start with 'K', 'L', or '5'")
-										return errors.New("wif can't contain special characters and must start with 'K', 'L', or '5'")
+										return err
 									} else {
+										warning.Set("")
+										prvKeyErr = false
+										isSeed = false
+										updatemigToKeyCntBttnStat()
+										return nil
+									}
+								} else {
+									isSeed = false
+									_, err := wifValidator(s)
+									if err != nil {
 										prvKeyErr = true
 										updatemigToKeyCntBttnStat()
-										warning.Set("Wif key is too short")
-										return errors.New("wif key is too short")
+										warning.Set(err.Error())
+										return err
 									}
-								} else if len(s) > 52 {
-									prvKeyErr = true
-									updatemigToKeyCntBttnStat()
-									warning.Set("Wif key is too long")
-									return errors.New("wif key is too long")
-								}
-
-								if noSpaces && matched && len(s) >= 51 {
-									for _, wallet := range creds.Wallets {
-										if wallet.WIF == migToKeyPrvKey.Text {
-											prvKeyErr = true
-											updatemigToKeyCntBttnStat()
-											warning.Set(fmt.Sprintf("This Wif is already used with Name %s.", wallet.Name))
-											return errors.New("this Wif is already used")
-										}
-									}
-									warning.Set("")
 									prvKeyErr = false
 									updatemigToKeyCntBttnStat()
+									warning.Set("")
 									return nil
-								} else {
-									return errors.New("wrong key format")
 								}
+
 							}
 
 							migToKeyNameEntry.Validator = func(s string) error {
@@ -953,93 +989,94 @@ func manageAccountsDia(creds Credentials) {
 
 		addWallet := widget.NewButtonWithIcon("Add Account", theme.ContentAddIcon(), func() {
 			privateKey := widget.NewEntry()
-			privateKey.PlaceHolder = "Enter your wif"
+			privateKey.PlaceHolder = "Enter your wif or seed phrase"
 			walletnamefrst := ""
 			walletNameBind := binding.BindString(&walletnamefrst)
 			walletNameEntry := widget.NewEntryWithData(walletNameBind)
 			walletNameEntry.PlaceHolder = "Enter a name for account"
-			nameSuggest := fmt.Sprintf("Sparky account %v", len(creds.WalletOrder)+1)
+			nameSuggest := fmt.Sprintf("Sparky Account %v", len(creds.WalletOrder)+1)
 			walletNameEntry.SetText(nameSuggest)
 			warningFrst := ""
 			warning := binding.BindString(&warningFrst)
 			warningLabel := widget.NewLabelWithData(warning)
-
+			mnemonic := ""
+			wif := ""
+			address := ""
 			privateKey.Validator = func(s string) error {
-				noSpaces := !regexp.MustCompile(`\s`).MatchString(s)
-				matched, _ := regexp.MatchString("^[KL5][a-zA-Z0-9]{0,51}$", s)
+				s = strings.TrimSpace(s)
+				containsSpace := strings.Contains(s, " ")
+				if containsSpace {
+					err := seedPhraseValidator(s)
+					if err != nil {
+						warning.Set(err.Error())
 
-				if len(s) < 1 {
-					warning.Set("Please enter wif")
-					return errors.New("please enter wif")
-				} else if len(s) < 52 {
-					if !noSpaces {
-						warning.Set("Wif can't contain spaces")
-						return errors.New("wif can't contain spaces")
-					} else if !matched {
-						warning.Set("Wif can't contain special characters and must start with 'K', 'L', or '5'")
-						return errors.New("wif can't contain special characters and must start with 'K', 'L', or '5'")
+						return err
 					} else {
-						warning.Set("Wif key is too short")
-						return errors.New("wif key is too short")
+						pk, _ := mnemonicToPk(s, 0)
+						keyPair := cryptography.NewPhantasmaKeys(pk)
+						wif = keyPair.WIF()
+						address = keyPair.Address().String()
+						msg, err := validateAccountInput(nil, creds.Wallets, "", "account", true, walletNameEntry.Text, keyPair.WIF(), keyPair.Address().String(), true)
+						if err != nil {
+
+							warning.Set(msg)
+							return err
+						}
+						warning.Set("")
+
+						mnemonic = s
+						return nil
 					}
-				} else if len(s) > 52 {
-					warning.Set("Wif key is too long")
-					return errors.New("wif key is too long")
+				} else {
+
+					mnemonic = ""
+					msg, err := wifValidator(s)
+					if err != nil {
+
+						warning.Set(msg)
+						return err
+					}
+
+					keyPair, _ := cryptography.FromWIF(s)
+					wif = keyPair.WIF()
+					address = keyPair.Address().String()
+					msg, err = validateAccountInput(nil, creds.Wallets, "", "account", true, walletNameEntry.Text, s, keyPair.Address().String(), true)
+					if err != nil {
+						warning.Set(msg)
+						return err
+					}
+
+					return nil
 				}
 
-				if noSpaces && matched && len(s) >= 51 {
-					for _, wallet := range creds.Wallets {
-						if wallet.WIF == privateKey.Text {
-							warning.Set("This Wif is already used.")
-							return errors.New("this Wif is already used")
-						}
-					}
-					warning.Set("")
-					return nil
-				} else {
-					return errors.New("wrong key format")
-				}
 			}
 
 			walletNameEntry.Validator = func(s string) error {
-				if len(s) < 1 {
-					warning.Set("Please enter at least 1 letter and max 20 for name")
-					return errors.New("not entered")
-				} else if len(s) <= 20 {
-					for _, savedName := range creds.WalletOrder {
-						if savedName == s {
-							warning.Set("Name already used")
-							return errors.New("already used")
-						}
-					}
-					warning.Set("")
-					return nil
-				} else {
-					warning.Set("Please use less than 20 letters")
-					return errors.New("too long")
+				msg, err := validateAccountInput(creds.WalletOrder, nil, s, "name", false)
+				if err != nil {
+					warning.Set(msg)
+					return err
 				}
+				return nil
+
 			}
 
-			addForm := dialog.NewForm("Add New Wallet", "Save", "Cancel", []*widget.FormItem{
+			addForm := dialog.NewForm("Add New Account", "Save", "Cancel", []*widget.FormItem{
 				widget.NewFormItem("Wallet Name", walletNameEntry),
 				widget.NewFormItem("Private Key", privateKey),
 				widget.NewFormItem("", warningLabel),
 			}, func(ok bool) {
 				if ok {
-					walletEntry, _ := walletNameBind.Get()
-					keyPair, err := cryptography.FromWIF(privateKey.Text)
-					if err != nil {
-						dialog.ShowInformation("Error", "Invalid WIF format", mainWindowGui)
-						return
-					}
-					address := keyPair.Address().String()
 
-					creds.Wallets[walletEntry] = Wallet{
-						Name:    walletEntry,
-						Address: address,
-						WIF:     privateKey.Text,
+					walletName, _ := walletNameBind.Get()
+
+					creds.Wallets[walletName] = Wallet{
+						Name:     walletName,
+						Address:  address,
+						WIF:      wif,
+						Mnemonic: mnemonic,
 					}
-					creds.WalletOrder = append(creds.WalletOrder, walletEntry)
+					creds.WalletOrder = append(creds.WalletOrder, walletName)
 					if err := saveCredentials(creds); err != nil {
 						log.Println("Failed to save credentials:", err)
 						dialog.ShowInformation("Error", "Failed to save credentials: "+err.Error(), mainWindowGui)
@@ -1056,7 +1093,7 @@ func manageAccountsDia(creds Credentials) {
 			addForm.Resize(fyne.NewSize(600, 300))
 			addForm.Show()
 
-			privateKey.SetValidationError(errors.New("please enter wif"))
+			privateKey.SetValidationError(errors.New("please enter wif or seed phrase"))
 			privateKey.Refresh()
 
 			walletNameEntry.CursorRow = len(walletNameEntry.Text)
@@ -1065,7 +1102,24 @@ func manageAccountsDia(creds Credentials) {
 		})
 
 		generateAccount := widget.NewButtonWithIcon("Generate Account", theme.SearchReplaceIcon(), func() {
-			keyPair := cryptography.GeneratePhantasmaKeys()
+
+			entropy, err := bip39.NewEntropy(defaultMnemonicEntropy)
+			if err != nil {
+				dialog.ShowError(err, mainWindowGui)
+				return
+			} // Generate the mnemonic phrase
+			mnemonic, err := bip39.NewMnemonic(entropy)
+			if err != nil {
+				dialog.ShowError(err, mainWindowGui)
+				return
+			}
+			pk, err := mnemonicToPk(mnemonic, 0)
+			if err != nil {
+				dialog.ShowError(err, mainWindowGui)
+				return
+			}
+			keyPair := cryptography.NewPhantasmaKeys(pk)
+
 			privateKey := keyPair.WIF()
 			address := keyPair.Address().String()
 			walletNameSuggest := "Sparky Account " + fmt.Sprint(len(creds.Wallets)+1)
@@ -1098,18 +1152,21 @@ func manageAccountsDia(creds Credentials) {
 			if manageAccCurrDia != nil {
 				manageAccCurrDia.Hide()
 			}
+			mnemonicBtnTxt := formatMnemonic(mnemonic)
 			manageAccCurrDia = dialog.NewForm("New account generated", "Save", "Scrap", []*widget.FormItem{
 				widget.NewFormItem("Name", nameEntry),
 				widget.NewFormItem("Address", widget.NewLabel(address)),
 				widget.NewFormItem("Private Key (Wif)", widget.NewButtonWithIcon(privateKey, theme.ContentCopyIcon(), func() { fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(privateKey) })),
+				widget.NewFormItem("Seed Phrase", widget.NewButtonWithIcon(mnemonicBtnTxt, theme.ContentCopyIcon(), func() { fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(mnemonic) })),
 				widget.NewFormItem("", warning),
 			}, func(b bool) {
 				if b {
 					name, _ := nameEntryBind.Get()
 					creds.Wallets[name] = Wallet{
-						Name:    name,
-						Address: address,
-						WIF:     privateKey,
+						Name:     name,
+						Address:  address,
+						WIF:      privateKey,
+						Mnemonic: mnemonic,
 					}
 					creds.WalletOrder = append(creds.WalletOrder, name)
 					if err := saveCredentials(creds); err != nil {

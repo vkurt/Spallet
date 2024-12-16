@@ -4,7 +4,10 @@ go 1.23.2
 
 require (
 	fyne.io/fyne/v2 v2.5.2
+	github.com/btcsuite/btcd v0.20.1-beta
+	github.com/btcsuite/btcutil v1.0.2
 	github.com/phantasma-io/phantasma-go v0.0.0-20240803171736-69b7df5a9bc8
+	github.com/tyler-smith/go-bip39 v1.1.0
 
 )
 
@@ -33,6 +36,7 @@ require (
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
+	golang.org/x/crypto v0.30.0 // indirect
 	golang.org/x/image v0.23.0 // indirect
 	golang.org/x/mobile v0.0.0-20241204233305-ce44b2716d33 // indirect
 	golang.org/x/net v0.32.0 // indirect

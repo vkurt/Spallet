@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
+
+	"github.com/tyler-smith/go-bip39"
 )
 
 // validateAccountInput validates a wallet name, account details, or just an account address based on the specified check type.
@@ -157,7 +160,36 @@ func wifValidator(wif string) (string, error) {
 	}
 
 }
+func seedPhraseValidator(phrase string) error {
+	words := strings.Split(phrase, " ")
+	wordCount := len(words)
 
+	switch {
+	case wordCount < 12:
+
+		return fmt.Errorf("seed phrase is too short, minimum 12 words")
+	case wordCount == 12:
+		if bip39.IsMnemonicValid(phrase) {
+
+			return nil
+		}
+
+		return fmt.Errorf("seed phrase is invalid")
+	case wordCount < 24:
+
+		return fmt.Errorf("continue to enter your 24-word seed phrase")
+	case wordCount == 24:
+		if bip39.IsMnemonicValid(phrase) {
+
+			return nil
+		}
+
+		return fmt.Errorf("seed phrase is invalid")
+	default:
+
+		return fmt.Errorf("seed phrase is invalid")
+	}
+}
 func pwdMatch(firstPwdEntry, scndPwdEntry string) (string, error) {
 
 	if firstPwdEntry == scndPwdEntry {

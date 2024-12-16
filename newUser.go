@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -14,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
+	"github.com/tyler-smith/go-bip39"
 )
 
 // Function to show Welcome Page
@@ -148,11 +150,11 @@ func showPasswordSetupPage() {
 
 // Function to show Wallet Setup Page
 func showWalletSetupPage(creds Credentials) {
-	generateWalletButton := widget.NewButton("Generate New Wallet", func() {
+	generateWalletButton := widget.NewButton("Generate New Account", func() {
 		generateNewWalletPage(creds) // Correctly pointing to generateNewWalletPage
 	})
-	importWifButton := widget.NewButton("Import WIF", func() {
-		showImportWifPage(creds)
+	importWifButton := widget.NewButton("Import Account", func() {
+		showImportAccountPage(creds)
 	})
 	restorePointBttn := widget.NewButton("Restore Point", func() {
 
@@ -419,13 +421,29 @@ func showWalletSetupPage(creds Credentials) {
 }
 
 func generateNewWalletPage(creds Credentials) {
-	keyPair := cryptography.GeneratePhantasmaKeys()
+	// Generate a random entropy (128 bits for 12-word phrase, 256 bits for 24-word phrase)
+	entropy, err := bip39.NewEntropy(defaultMnemonicEntropy)
+	if err != nil {
+		panic(err)
+	} // Generate the mnemonic phrase
+	mnemonic, err := bip39.NewMnemonic(entropy)
+	if err != nil {
+		dialog.ShowError(err, mainWindowGui)
+		return
+	}
+	pk, err := mnemonicToPk(mnemonic, 0)
+	if err != nil {
+		dialog.ShowError(err, mainWindowGui)
+		return
+	}
+
+	keyPair := cryptography.NewPhantasmaKeys(pk)
 	privateKey := keyPair.WIF()
 	address := keyPair.Address().String()
 	nameEntry := widget.NewEntry()
 	nameEntry.SetText("Sparky Account 1")
 	nameEntry.TypedShortcut(&fyne.ShortcutSelectAll{})
-	var isValidName, wifCopied bool
+	var isValidName, wifCopied, seedCopied bool
 	okButton := widget.NewButton("Continue", func() {
 
 		if creds.Wallets == nil {
@@ -433,9 +451,10 @@ func generateNewWalletPage(creds Credentials) {
 		}
 		// Add wallet to credentials and mark as last used
 		creds.Wallets[nameEntry.Text] = Wallet{
-			Name:    nameEntry.Text,
-			Address: address,
-			WIF:     privateKey,
+			Name:     nameEntry.Text,
+			Address:  address,
+			WIF:      privateKey,
+			Mnemonic: mnemonic,
 		}
 		creds.WalletOrder = append(creds.WalletOrder, nameEntry.Text)
 		creds.LastSelectedWallet = nameEntry.Text
@@ -448,7 +467,7 @@ func generateNewWalletPage(creds Credentials) {
 	})
 	okButton.Disable() // Initially disable the Continue button
 	updateokBttnState := func() {
-		if isValidName && wifCopied {
+		if isValidName && wifCopied && seedCopied {
 			okButton.Enable()
 		} else {
 			okButton.Disable()
@@ -475,6 +494,13 @@ func generateNewWalletPage(creds Credentials) {
 		wifCopied = true // Enable the Continue button after WIF is copied
 		updateokBttnState()
 	})
+	btnText := formatMnemonic(mnemonic)
+	copyMnemonicButton := widget.NewButtonWithIcon(btnText, theme.ContentCopyIcon(), func() {
+		fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(privateKey)
+		dialog.ShowInformation("Copied", "Seed phrase copied to clipboard", mainWindowGui)
+		seedCopied = true // Enable the Continue button after Seed is copied
+		updateokBttnState()
+	})
 
 	cancelButton := widget.NewButton("Cancel", func() {
 		showWalletSetupPage(creds) // Go back to wallet setup page
@@ -484,8 +510,9 @@ func generateNewWalletPage(creds Credentials) {
 		widget.NewFormItem("Name", nameEntry),
 		widget.NewFormItem("Address", widget.NewLabel(address)),
 		widget.NewFormItem("Private Key (Wif)", copyWifButton),
+		widget.NewFormItem("Seed Phrase", copyMnemonicButton),
 	)
-	warning := widget.NewLabelWithStyle("⚠️In order to continue please copy your Wif and store it in a safe place⚠️", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+	warning := widget.NewLabelWithStyle("⚠️In order to continue please copy your Wif and Seed Phrase and store them in a safe place⚠️", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 	// Use container.NewMax to cover full width
 	genAccHeader := widget.NewLabelWithStyle("Generated account information", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 	generateAccContent := container.NewVBox(genAccHeader, generatedAccForm, warning, container.NewGridWithColumns(2, cancelButton, okButton))
@@ -496,17 +523,34 @@ func generateNewWalletPage(creds Credentials) {
 }
 
 // Function to Show Import WIF Page
-func showImportWifPage(creds Credentials) {
-	wifEntry := widget.NewEntry()
+func showImportAccountPage(creds Credentials) {
+	wifOrSeedEntry := widget.NewEntry()
 	walletNameEntry := widget.NewEntry()
 	walletNameEntry.SetText("Sparky Account 1")
 	walletNameEntry.TypedShortcut(&fyne.ShortcutSelectAll{})
+	var isValidName, isValidWif, isSeed bool
+	var keyPair cryptography.PhantasmaKeys
+	var mnemonic = ""
 	importButton := widget.NewButton("Import", func() {
-		keyPair, err := cryptography.FromWIF(wifEntry.Text)
-		if err != nil {
-			dialog.ShowInformation("Error", "Invalid WIF format", mainWindowGui)
-			return
+		if isSeed {
+			mnemonic = wifOrSeedEntry.Text
+			pk, err := mnemonicToPk(mnemonic, 0)
+			if err != nil {
+				dialog.ShowInformation("Error", fmt.Sprintf("%v", err), mainWindowGui)
+				return
+			}
+
+			keyPair = cryptography.NewPhantasmaKeys(pk)
+
+		} else {
+			var err error
+			keyPair, err = cryptography.FromWIF(wifOrSeedEntry.Text)
+			if err != nil {
+				dialog.ShowInformation("Error", "Invalid WIF format", mainWindowGui)
+				return
+			}
 		}
+
 		address := keyPair.Address().String()
 		walletName := walletNameEntry.Text
 
@@ -515,25 +559,25 @@ func showImportWifPage(creds Credentials) {
 		}
 		// Add wallet to credentials and mark as last used
 		creds.Wallets[walletName] = Wallet{
-			Name:    walletName,
-			Address: address,
-			WIF:     wifEntry.Text,
+			Name:     walletName,
+			Address:  address,
+			WIF:      keyPair.WIF(),
+			Mnemonic: mnemonic,
 		}
 		creds.WalletOrder = append(creds.WalletOrder, walletName)
 		creds.LastSelectedWallet = walletName
 
-		err = startWallet(creds)
+		err := startWallet(creds)
 		if err != nil {
 			return
 		}
 	})
 	importButton.Disabled()
-	wifEntryForm := widget.NewForm(
+	wifOrSeedEntryForm := widget.NewForm(
 		widget.NewFormItem("Name", walletNameEntry),
-		widget.NewFormItem("Wif", wifEntry),
+		widget.NewFormItem("Wif Or Seed Phrase", wifOrSeedEntry),
 	)
 
-	var isValidName, isValidWif bool
 	updateImportBttnState := func() {
 		if isValidName && isValidWif {
 			importButton.Enable()
@@ -542,18 +586,31 @@ func showImportWifPage(creds Credentials) {
 		}
 
 	}
-	wifEntry.Validator = func(s string) error {
-		_, err := wifValidator(s)
-		if err != nil {
-			isValidWif = false
-			updateImportBttnState()
-			return err
+
+	wifOrSeedEntry.Validator = func(s string) error {
+		s = strings.TrimSpace(s)
+		containsSpace := strings.Contains(s, " ")
+		if containsSpace {
+			err := seedPhraseValidator(s)
+			if err != nil {
+				return err
+			} else {
+				return nil
+			}
 		} else {
+			isSeed = false
+			_, err := wifValidator(s)
+			if err != nil {
+				isValidWif = false
+				updateImportBttnState()
+				return err
+			}
 			isValidWif = true
 			updateImportBttnState()
 			return nil
 		}
 	}
+
 	walletNameEntry.Validator = func(s string) error {
 		names := []string{}
 		_, err := validateAccountInput(names, nil, s, "name", false)
@@ -577,7 +634,7 @@ func showImportWifPage(creds Credentials) {
 	space := widget.NewLabel("\t\t\t\t\t\t\t\t\t\t\t") //  still dont understand how to control width inside an layout it shrinks to min size so tried to prevent it with this
 	importWifContent := container.NewVBox(
 		formHeader,
-		wifEntryForm,
+		wifOrSeedEntryForm,
 		container.NewGridWithColumns(2, cancelButton, importButton),
 		space,
 	)
