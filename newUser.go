@@ -198,7 +198,7 @@ func showWalletSetupPage(creds Credentials) {
 						for _, fileName := range expectedFiles {
 							filePath := filepath.Join(directory, fileName)
 							if _, err := os.Stat(filePath); err == nil {
-								foundFiles += fmt.Sprintf(fileName + "\n")
+								foundFiles += fmt.Sprintf("%v \n", fileName)
 
 								switch fileName {
 								case "credentials.spallet": // restoring unsaved accounts
@@ -321,7 +321,7 @@ func showWalletSetupPage(creds Credentials) {
 
 								}
 
-								notFoundFiles += fmt.Sprintf(fileName + "\n")
+								notFoundFiles += fmt.Sprintf("%v \n", fileName)
 							}
 
 						}

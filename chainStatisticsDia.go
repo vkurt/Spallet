@@ -74,7 +74,7 @@ func buildAndShowChainStatistics() {
 	bckBttn := widget.NewButtonWithIcon("", theme.WindowCloseIcon(), func() { currentMainDialog.Hide() })
 	chnStcsCntnt := container.NewVScroll(statistics)
 	chnStcsLyt := container.NewBorder(nil, bckBttn, nil, nil, chnStcsCntnt)
-	currentMainDialog = dialog.NewCustomWithoutButtons(fmt.Sprintf("Chain Statistics For "+userSettings.NetworkName), chnStcsLyt, mainWindowGui)
+	currentMainDialog = dialog.NewCustomWithoutButtons(fmt.Sprintf("Chain Statistics For %v", userSettings.NetworkName), chnStcsLyt, mainWindowGui)
 	currentMainDialog.Resize(fyne.NewSize(chnStcsCntnt.MinSize().Width, mainWindowGui.Canvas().Size().Height-50))
 	closeUpdatingDialog()
 	currentMainDialog.Show()

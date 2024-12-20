@@ -1,6 +1,6 @@
 [Details]
-Icon = "Icon.png"
-Name = "Spallet"
-ID = "com.spallet.app"
-Version = "1.0.0"
-Build = 1
+  Icon = "Icon.png"
+  Name = "Spallet"
+  ID = "com.spallet.app"
+  Version = "0.5.0"
+  Build = 5
