@@ -46,7 +46,91 @@ And perhaps some other features I can't recall right now.
 ## Planned Features
 I’ve got some exciting plans for Spallet, like integrating Saturn Dex. However, since this is a fun project, feel free to use it as is. Since it's open-source, you can fork it, continue its development, or even contribute to the codebase!
 
-## Contributing
-Want to contribute to Spallet? Please follow the guide below and install the necessary tools:
-[Getting Started with Fyne](https://docs.fyne.io/started/)
+## Building Instructions
+
+### Desktop
+
+1. **Install Dependencies**
+   - Ensure all dependencies required for the project are installed.
+
+2. **Build and Run on Different Platforms**
+   - **Windows:**
+     - Navigate to the `desktop` folder in your console.
+     - To test your changes, run:
+       ```sh
+       go run .
+       ```
+     - To build an executable, you have two options:
+       - Using Fyne:
+         ```sh
+         fyne package -os windows -icon icon.png
+         ```
+       - Using Go:
+         ```sh
+         go build -ldflags "-H windowsgui"
+         ```
+   - **macOS:**
+     - Navigate to the `desktop` folder in your console.
+     - To test your changes, run:
+       ```sh
+       go run .
+       ```
+     - To build an executable, you have two options:
+       - Using Fyne:
+         ```sh
+         fyne package -os darwin -icon icon.png
+         ```
+       - Using Go:
+         ```sh
+         go build -o myapp-macos
+         ```
+   - **Linux:**
+     - Navigate to the `desktop` folder in your console.
+     - To test your changes, run:
+       ```sh
+       go run .
+       ```
+     - To build an executable, you have two options:
+       - Using Fyne:
+         ```sh
+         fyne package -os linux -icon icon.png
+         ```
+       - Using Go:
+         ```sh
+         go build -o myapp-linux
+         ```
+
+### Mobile
+
+1. **Install Dependencies**
+   - Ensure all dependencies required for the project are installed.
+
+2. **Build and Run for Mobile**
+   - **Android:**
+     - Navigate to the `mobile` folder in your console.
+     - To build an Android `.APK` file, run:
+       ```sh
+       fyne package -os android -appID com.spallet.app -icon icon.png
+       ```
+     - To test your changes on the desktop, run:
+       ```sh
+       go run .
+       ```
+   - **iOS:**
+     - iOS builds require macOS. Follow these steps on a Mac:
+       - Navigate to the `mobile` folder in your console.
+       - To build an iOS app, run:
+         ```sh
+         fyne package -os ios -appID com.spallet.app -icon icon.png
+         ```
+
+### Notes
+
+- Ensure you have Go and Fyne installed on your system [Getting Started with Fyne](https://docs.fyne.io/started/).
+- For cross-platform builds, refer to the [Fyne cross compiling](https://docs.fyne.io/started/cross-compiling).
+- On macOS and Linux, you might need to adjust executable permissions with:
+  ```sh
+  chmod +x myapp-macos
+  chmod +x myapp-linux
+
 
