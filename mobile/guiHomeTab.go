@@ -18,12 +18,22 @@ var nftBtns = container.NewVBox(container.NewVBox())
 var settingsDia dialog.Dialog
 
 func homeGui(creds core.Credentials) {
-
+	var onChainNameText string
 	walletSelectButtonName := creds.LastSelectedWallet
 	walletAddress := creds.Wallets[creds.LastSelectedWallet].Address
 	addressBookBtn := widget.NewButtonWithIcon("", resourceAddressbookPng, func() {
 		showAdddressBookWin(creds.Password)
 	})
+
+	if core.LatestAccountData.OnChainName == "anonymous" && core.LatestAccountData.IsStaker {
+		onChainNameText = "You can forge it from hodling tab"
+	} else if core.LatestAccountData.OnChainName != "anonymous" {
+		onChainNameText = core.LatestAccountData.OnChainName
+	} else {
+		onChainNameText = "This account is not eligible"
+	}
+	onChainNameLabel := widget.NewLabel(fmt.Sprintf("Address On chain name:\n\t%v", onChainNameText))
+	onChainNameLabel.Wrapping = fyne.TextWrapWord
 
 	settingsBtn := widget.NewButtonWithIcon("", theme.SettingsIcon(), func() {
 		network := widget.NewButton("Network", func() {
@@ -37,12 +47,11 @@ func homeGui(creds core.Credentials) {
 		settingsDia.Show()
 	})
 
-	rescuePointBtn := widget.NewButtonWithIcon("", theme.LoginIcon(), func() {})
 	chainStatsBtn := widget.NewButtonWithIcon("", resourceChainstatsPng, func() {
 		buildAndShowChainStatistics()
 	})
 
-	buttonsContainer := container.NewGridWithColumns(4, addressBookBtn, rescuePointBtn, chainStatsBtn, settingsBtn)
+	buttonsContainer := container.NewGridWithColumns(3, addressBookBtn, chainStatsBtn, settingsBtn)
 	addressCopyButtonName := walletAddress[:5] + "..." + walletAddress[len(walletAddress)-5:]
 	addressCopyBtn := widget.NewButtonWithIcon(addressCopyButtonName, theme.ContentCopyIcon(), func() {
 		fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(creds.Wallets[creds.LastSelectedWallet].Address)
@@ -66,7 +75,7 @@ func homeGui(creds core.Credentials) {
 		}
 	})
 	walletInfoGroupLyt := container.NewBorder(nil, nil, walletSelect, walletExpBtn, addressCopyBtn)
-	homeContent := container.NewVScroll(container.NewVBox(walletInfoGroupLyt, buttonsContainer, badges, tokenBtns))
+	homeContent := container.NewVScroll(container.NewVBox(walletInfoGroupLyt, onChainNameLabel, buttonsContainer, badges, tokenBtns))
 	// homeContent.SetMinSize()
 	homeTab.Content = homeContent
 	homeTab.Content.Refresh()

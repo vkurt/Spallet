@@ -143,7 +143,7 @@ func buildAndShowAccInfo(creds core.Credentials) {
 	if core.LatestAccountData.IsStaker {
 		accStakingInfoHeader = "Staking Info"
 		accStakingInfo = fmt.Sprintf("Staked Soul:\t\t%v Soul\nGenerated sparks:\t%v Kcal\nNext spark gen. after:\t%v\nSpark gen. boost:\t\t%v%%\nDaily spark gen.:\t\t%v Kcal\nCollect Soul after:\t\t%v\n",
-			core.FormatBalance(core.LatestAccountData.StakedBalances.Amount, core.SoulDecimals), core.FormatBalance(core.LatestAccountData.StakedBalances.Unclaimed, core.KcalDecimals), time.Duration(core.LatestAccountData.RemainedTimeForKcalGen)*time.Second, core.LatestAccountData.KcalBoost, core.FormatBalance(core.LatestAccountData.KcalDailyProd, core.KcalDecimals), time.Duration(core.LatestAccountData.RemainedTimeForUnstake)*time.Second)
+			core.FormatBalance(core.LatestAccountData.StakedBalances.Amount, core.SoulDecimals), core.FormatBalance(core.LatestAccountData.StakedBalances.Unclaimed, core.KcalDecimals), core.FormatDuration(time.Duration(core.LatestAccountData.RemainedTimeForKcalGen)*time.Second), core.LatestAccountData.KcalBoost, core.FormatBalance(core.LatestAccountData.KcalDailyProd, core.KcalDecimals), core.FormatDuration(time.Duration(core.LatestAccountData.RemainedTimeForUnstake)*time.Second))
 
 		if accSoulAmount.Cmp(big.NewInt(100000000)) > 0 && core.LatestAccountData.StakedBalances.Amount.Cmp(big.NewInt(100000000)) >= 0 {
 			accStakingInfo = accStakingInfo + "\nSoul slacker! Go full throttle and stake it all! 🚀"

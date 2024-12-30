@@ -990,6 +990,10 @@ func manageAccountsDia(creds core.Credentials) { // migrating accounts have a bu
 
 		addWallet := widget.NewButtonWithIcon("Add Account", theme.ContentAddIcon(), func() {
 			privateKey := widget.NewEntry()
+			pasteBtn := widget.NewButtonWithIcon("", theme.ContentPasteIcon(), func() {
+				privateKey.SetText(spallet.Driver().AllWindows()[0].Clipboard().Content())
+			})
+			entryBox := container.NewBorder(nil, nil, nil, pasteBtn, privateKey)
 			privateKey.PlaceHolder = "Enter your wif or seed phrase"
 			walletnamefrst := ""
 			walletNameBind := binding.BindString(&walletnamefrst)
@@ -1064,7 +1068,7 @@ func manageAccountsDia(creds core.Credentials) { // migrating accounts have a bu
 
 			addForm := dialog.NewForm("Add New Account", "Save", "Cancel", []*widget.FormItem{
 				widget.NewFormItem("Wallet Name", walletNameEntry),
-				widget.NewFormItem("Private Key", privateKey),
+				widget.NewFormItem("Private Key", entryBox),
 				widget.NewFormItem("", warningLabel),
 			}, func(ok bool) {
 				if ok {

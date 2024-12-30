@@ -225,12 +225,12 @@ func displayTransactions(transactions []TransactionResult, address string) {
 			}
 
 			timestamp := time.Unix(int64(tx.Timestamp), 0)
-			shortTxHash := tx.Hash[:17] + "..."
+			shortTxHash := tx.Hash[:30] + "..."
 			payload := hexToASCII(tx.Payload)
 			if len(payload) > 15 {
 				payload = payload[:12] + "..."
 			}
-			button := widget.NewButton(fmt.Sprintf("%s - %s - %s - %s -%s", timestamp.Format("15:04:05"), shortTxHash, payload, txState, txType), func(txHash string) func() {
+			button := widget.NewButton(fmt.Sprintf("%s - %s - %s - %s\n%s", timestamp.Format("15:04:05"), payload, txState, txType, shortTxHash), func(txHash string) func() {
 				return func() {
 					explorerURL := fmt.Sprintf("%s%s", core.UserSettings.TxExplorerLink, txHash)
 					parsedURL, err := url.Parse(explorerURL)

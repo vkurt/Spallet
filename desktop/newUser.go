@@ -526,6 +526,10 @@ func generateNewWalletPage(creds core.Credentials) {
 // Function to Show Import WIF Page
 func showImportAccountPage(creds core.Credentials) {
 	wifOrSeedEntry := widget.NewEntry()
+	pasteBtn := widget.NewButtonWithIcon("", theme.ContentPasteIcon(), func() {
+		wifOrSeedEntry.SetText(spallet.Driver().AllWindows()[0].Clipboard().Content())
+	})
+	entryBox := container.NewBorder(nil, nil, nil, pasteBtn, wifOrSeedEntry)
 	walletNameEntry := widget.NewEntry()
 	walletNameEntry.SetText("Sparky Account 1")
 	walletNameEntry.TypedShortcut(&fyne.ShortcutSelectAll{})
@@ -576,7 +580,7 @@ func showImportAccountPage(creds core.Credentials) {
 	importButton.Disabled()
 	wifOrSeedEntryForm := widget.NewForm(
 		widget.NewFormItem("Name", walletNameEntry),
-		widget.NewFormItem("Wif Or Seed Phrase", wifOrSeedEntry),
+		widget.NewFormItem("Wif Or Seed Phrase", entryBox),
 	)
 
 	updateImportBttnState := func() {

@@ -241,13 +241,13 @@ func manageAccountsDia(creds core.Credentials) {
 					}
 					privateKey := creds.Wallets[walletName].WIF
 					address := wallet.Address
-					addressShort := address[:9] + "..." + address[len(address)-9:]
+					addressFormat := address[:24] + "\n" + address[24:]
 					formattedWif := privateKey[:18] + "\n" + privateKey[18:35] + "\n" + privateKey[35:]
 					dialog.ShowCustom("Please dont share this info with anyone", "I'll be careful with this", container.NewVBox(
 						widget.NewForm(
 							widget.NewFormItem("Name", widget.NewLabel(wallet.Name)),
-							widget.NewFormItem("Address", widget.NewLabel(addressShort)),
-							widget.NewFormItem("Wif", widget.NewButtonWithIcon(formattedWif, theme.ContentCopyIcon(), func() {
+							widget.NewFormItem("Address", widget.NewLabel(addressFormat)),
+							widget.NewFormItem("Private Key", widget.NewButtonWithIcon(formattedWif, theme.ContentCopyIcon(), func() {
 								fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(privateKey)
 								dialog.ShowInformation("Copied", "Wif copied to the clipboard", manAccWin)
 							})),
@@ -511,9 +511,9 @@ func manageAccountsDia(creds core.Credentials) {
 						toGenAccForm := widget.NewForm(
 							widget.NewFormItem("Name", genAccNameEntry),
 							widget.NewFormItem("Address", widget.NewLabel(genAddress)),
-							widget.NewFormItem("Private Key (Wif)", widget.NewButtonWithIcon(genPrivateKey, theme.ContentCopyIcon(), func() {
+							widget.NewFormItem("Private Key", widget.NewButtonWithIcon(genPrivateKey, theme.ContentCopyIcon(), func() {
 								fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(genPrivateKey)
-								dialog.ShowInformation("Copied", "Private Key (wif) copied to the clipboard", manAccWin)
+								dialog.ShowInformation("Copied", "Private Key copied to the clipboard", manAccWin)
 							})),
 							widget.NewFormItem("Seed Phrase", widget.NewButtonWithIcon(seedCopyBtnTxt, theme.ContentCopyIcon(), func() {
 								fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(mnemonic)
@@ -899,7 +899,7 @@ func manageAccountsDia(creds core.Credentials) {
 
 						migToKeyAccForm := widget.NewForm(
 							widget.NewFormItem("Name", migToKeyNameEntry),
-							widget.NewFormItem("Private Key (Wif)", migToKeyPrvKey),
+							widget.NewFormItem("Private Key", migToKeyPrvKey),
 						)
 						exitMigToKeyBttn := widget.NewButtonWithIcon("", theme.CancelIcon(), func() {
 							migToKeyDia.Hide()
@@ -998,6 +998,10 @@ func manageAccountsDia(creds core.Credentials) {
 
 	addWallet := widget.NewButtonWithIcon("Add Account", theme.ContentAddIcon(), func() {
 		privateKey := widget.NewEntry()
+		pasteBtn := widget.NewButtonWithIcon("", theme.ContentPasteIcon(), func() {
+			privateKey.SetText(spallet.Driver().AllWindows()[0].Clipboard().Content())
+		})
+		entryBox := container.NewBorder(nil, nil, nil, pasteBtn, privateKey)
 		privateKey.PlaceHolder = "Enter your wif or seed phrase"
 		walletnamefrst := ""
 		walletNameBind := binding.BindString(&walletnamefrst)
@@ -1072,7 +1076,7 @@ func manageAccountsDia(creds core.Credentials) {
 
 		addForm := dialog.NewForm("Add New Account", "Save", "Cancel", []*widget.FormItem{
 			widget.NewFormItem("Wallet Name", walletNameEntry),
-			widget.NewFormItem("Private Key", privateKey),
+			widget.NewFormItem("Private Key", entryBox),
 			widget.NewFormItem("", warningLabel),
 		}, func(ok bool) {
 			if ok {
@@ -1160,10 +1164,12 @@ func manageAccountsDia(creds core.Credentials) {
 			manageAccCurrDia.Hide()
 		}
 		mnemonicBtnTxt := core.FormatMnemonic(mnemonic, 3)
+		addressFormat := address[:24] + "\n" + address[24:]
+		privKeyFormat := privateKey[:18] + "\n" + privateKey[18:35] + "\n" + privateKey[35:]
 		manageAccCurrDia = dialog.NewForm("New account generated", "Save", "Scrap", []*widget.FormItem{
 			widget.NewFormItem("Name", nameEntry),
-			widget.NewFormItem("Address", widget.NewLabel(address)),
-			widget.NewFormItem("Private Key (Wif)", widget.NewButtonWithIcon(privateKey, theme.ContentCopyIcon(), func() { fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(privateKey) })),
+			widget.NewFormItem("Address", widget.NewLabelWithStyle(addressFormat, fyne.TextAlignCenter, fyne.TextStyle{Bold: false})),
+			widget.NewFormItem("Private Key", widget.NewButtonWithIcon(privKeyFormat, theme.ContentCopyIcon(), func() { fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(privateKey) })),
 			widget.NewFormItem("Seed Phrase", widget.NewButtonWithIcon(mnemonicBtnTxt, theme.ContentCopyIcon(), func() { fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(mnemonic) })),
 			widget.NewFormItem("", warning),
 		}, func(b bool) {

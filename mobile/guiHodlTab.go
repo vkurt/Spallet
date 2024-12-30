@@ -23,15 +23,22 @@ func hodlGui(creds core.Credentials) {
 
 	var countdownForSmRw string
 	var countdownForCrwn string
-
+	var onChainNameText string
 	stakeFeeLimit := core.UserSettings.DefaultGasLimit
 	currentTime := time.Now()
 
+	if core.LatestAccountData.OnChainName == "anonymous" {
+		onChainNameText = "Not forged by Specky"
+	} else {
+		onChainNameText = core.LatestAccountData.OnChainName
+	}
+	onChainNameLabel := widget.NewLabel(fmt.Sprintf("Address On chain name:\n\t%v", onChainNameText))
+
 	// Claiming Kcal stuff
 	remainedTimeForKcalGen := time.Unix(currentTime.Unix()+core.LatestAccountData.RemainedTimeForKcalGen, 0).Local()
-	remainedTimeForKcalGenLabel := widget.NewLabel(fmt.Sprintf("Next Kcal generation time:\n\t%v", remainedTimeForKcalGen))
+	remainedTimeForKcalGenLabel := widget.NewLabel(fmt.Sprintf("Next Kcal generation ritual:\n\t%v", remainedTimeForKcalGen))
 	remainedTimeForKcalGenLabel.Wrapping = fyne.TextWrapWord
-	unclaimedBalanceLabel := widget.NewLabel(fmt.Sprintf("Earned Sparks: %s Kcal", core.FormatBalance(core.LatestAccountData.StakedBalances.Unclaimed, core.KcalDecimals)))
+	unclaimedBalanceLabel := widget.NewLabel(fmt.Sprintf("Earned Sparks:\n\t%s Kcal", core.FormatBalance(core.LatestAccountData.StakedBalances.Unclaimed, core.KcalDecimals)))
 	// unclaimedBalanceLabel.Wrapping = fyne.TextWrapWord
 	kcalClaimButton := widget.NewButton("Forge with Sparks", func() {
 
@@ -93,10 +100,17 @@ func hodlGui(creds core.Credentials) {
 		accFreeSoulAmount = big.NewInt(0)
 	}
 	stakingTimeLabel := widget.NewLabel(fmt.Sprintf("Last addition specky's Soul stash:\n\t%s", time.Unix(int64(core.LatestAccountData.StakedBalances.Time), 0).Local()))
+	waitingPeriod := core.LatestAccountData.RemainedTimeForUnstake
+	waitingMessage := ""
+	if waitingPeriod == 0 {
+		waitingMessage = "You can drain Speck's Soul"
+	} else {
+		waitingMessage = (time.Duration(core.LatestAccountData.RemainedTimeForUnstake) * time.Second).String()
+	}
 
-	remainedTimeForUnstakeLabel := widget.NewLabel(fmt.Sprintf("Clan's Waiting Period:\n\t%v", time.Duration(core.LatestAccountData.RemainedTimeForUnstake)*time.Second))
-	kcalBoostRateLabel := widget.NewLabel(fmt.Sprintf("Specky's motivation rate\t%v%%", core.LatestAccountData.KcalBoost))
-	kcalDailyProdLabel := widget.NewLabel(fmt.Sprintf("Specky Spark Output\n\t%s Kcal", core.FormatBalance(core.LatestAccountData.KcalDailyProd, core.KcalDecimals)))
+	remainedTimeForUnstakeLabel := widget.NewLabel(fmt.Sprintf("Clan's Waiting Period:\n\t%v", waitingMessage))
+	kcalBoostRateLabel := widget.NewLabel(fmt.Sprintf("Specky's motivation rate:\n\t%v%%", core.LatestAccountData.KcalBoost))
+	kcalDailyProdLabel := widget.NewLabel(fmt.Sprintf("Specky Spark Output:\n\t%s Kcal", core.FormatBalance(core.LatestAccountData.KcalDailyProd, core.KcalDecimals)))
 	soulInput := widget.NewEntry() //Input for staking/unstaking
 	var amount = big.NewInt(0)
 
@@ -447,7 +461,7 @@ func hodlGui(creds core.Credentials) {
 	}
 
 	// *************Soulmaster things****************
-	currentSoulMasterRewardAmountLabel := widget.NewLabel(fmt.Sprintf("Master's Bounty\t%.4f", core.LatestChainStatisticsData.EstSMReward))
+	currentSoulMasterRewardAmountLabel := widget.NewLabel(fmt.Sprintf("Master's Bounty:\n\t%.4f Soul", core.LatestChainStatisticsData.EstSMReward))
 	smRwrdButton := widget.NewButton("Honor the Masters", func() {
 
 		smRwrdConfirmLabel := widget.NewLabel("The moment of tribute has arrived. By distributing the Master's Bounty, you recognize the dedication and strength of our Soul Masters. Are you ready to honor their achievements and share the rewards?")
@@ -628,8 +642,8 @@ func hodlGui(creds core.Credentials) {
 		}
 
 	}
-	remanedTimeForGetttingCrownLabel := widget.NewLabel(fmt.Sprintf("Coronation after:\t%s", countdownForCrwn))
-	remainedTimeForGettingSoulMasterRewardLabel := widget.NewLabel(fmt.Sprintf("Mastery Awaiting Time:\t%s", countdownForSmRw))
+	remanedTimeForGetttingCrownLabel := widget.NewLabel(fmt.Sprintf("Coronation after:\n\t%s", countdownForCrwn))
+	remainedTimeForGettingSoulMasterRewardLabel := widget.NewLabel(fmt.Sprintf("Mastery Awaiting Time:\n\t%s", countdownForSmRw))
 
 	stakeUnstakeBttn := widget.NewButton("Drain/Power Up Specky", func() {
 		currentMainDialog = dialog.NewCustomWithoutButtons("Drain/Power Up Specky", stakeContainer, mainWindow)
@@ -649,6 +663,7 @@ func hodlGui(creds core.Credentials) {
 		soulMasterMessage.Wrapping = fyne.TextWrapWord
 		hodlTabScroll.Content = container.NewVBox(
 			soulMasterMessage,
+			onChainNameLabel,
 			stakedBalancesLabel,
 			unclaimedBalanceLabel,
 			remainedTimeForKcalGenLabel,
@@ -672,6 +687,7 @@ func hodlGui(creds core.Credentials) {
 		stakerMessageLabel.Wrapping = fyne.TextWrapWord
 		hodlTabScroll.Content = container.NewVBox(
 			stakerMessageLabel,
+			onChainNameLabel,
 			stakedBalancesLabel,
 			unclaimedBalanceLabel,
 			remainedTimeForKcalGenLabel,

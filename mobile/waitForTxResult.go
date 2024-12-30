@@ -16,7 +16,7 @@ import (
 	"github.com/phantasma-io/phantasma-go/pkg/util"
 )
 
-func waitForTxResult(txHash string, creds core.Credentials) {
+func waitForTxResult(txHash string, creds core.Credentials, txCount int) {
 	tries := 0
 	txResult, _ := core.Client.GetTransaction(txHash)
 	showUpdatingDialog()
@@ -33,7 +33,7 @@ func waitForTxResult(txHash string, creds core.Credentials) {
 				currentMainDialog.Hide()
 			}
 
-			showTxResultDialog("Transaction successfully minted.", creds, txResult)
+			showTxResultDialog("Transaction successfully minted.", creds, txResult, txCount)
 
 			break
 		} else if txResult.StateIsFault() {
@@ -42,7 +42,7 @@ func waitForTxResult(txHash string, creds core.Credentials) {
 				currentMainDialog.Hide()
 			}
 
-			showTxResultDialog("Transaction failed.", creds, txResult)
+			showTxResultDialog("Transaction failed.", creds, txResult, txCount)
 
 			break
 		} else if tries > 14 {
@@ -51,7 +51,7 @@ func waitForTxResult(txHash string, creds core.Credentials) {
 				currentMainDialog.Hide()
 			}
 
-			showTxResultDialog("Transaction Data fetch timed out.", creds, response.TransactionResult{Hash: txHash, Fee: "0"})
+			showTxResultDialog("Transaction Data fetch timed out.", creds, response.TransactionResult{Hash: txHash, Fee: "0"}, txCount)
 
 			break
 		}
@@ -60,7 +60,7 @@ func waitForTxResult(txHash string, creds core.Credentials) {
 	}
 }
 
-func showTxResultDialog(header string, cred core.Credentials, txResult response.TransactionResult) {
+func showTxResultDialog(header string, creds core.Credentials, txResult response.TransactionResult, txCount int) {
 
 	fee, err := new(big.Int).SetString(txResult.Fee, 10)
 
@@ -76,8 +76,7 @@ func showTxResultDialog(header string, cred core.Credentials, txResult response.
 	headerLabel := widget.NewLabelWithStyle(header, fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 
 	var resultDia dialog.Dialog
-	time.Sleep(time.Second)
-	core.DataFetch(cred, rootPath)
+
 	explorerBtn := widget.NewButton("Show on explorer", func() {
 		explorerURL := fmt.Sprintf("%s%s", core.UserSettings.TxExplorerLink, txResult.Hash)
 		if parsedURL, err := url.Parse(explorerURL); err == nil {
@@ -100,22 +99,40 @@ func showTxResultDialog(header string, cred core.Credentials, txResult response.
 	if currentMainDialog != nil {
 		currentMainDialog.Hide()
 	}
-
-	closeUpdatingDialog()
 	resultDia.Show()
+	closeUpdatingDialog()
+	if txResult.StateIsSuccess() {
+		for i := 0; i < 40; i++ {
+			fmt.Println("Checking tx count")
+			core.DataFetch(creds, rootPath)
+			time.Sleep(time.Millisecond * 250)
+			if txCount < core.LatestAccountData.TransactionCount {
+				autoUpdate(updateInterval, creds)
+				break
+			}
+		}
+	} else {
+
+		time.Sleep(time.Second * 2)
+		core.DataFetch(creds, rootPath)
+		autoUpdate(updateInterval, creds)
+	}
+
 }
 
 // SendTransaction sends a transaction and handles the result
 func sendTransaction(txHex string, creds core.Credentials) {
 	go func() {
+		txCount := core.LatestAccountData.TransactionCount
 		txHash, err := core.Client.SendRawTransaction(txHex)
-		if err != nil || util.ErrorDetect(txHash) {
-			dialog.ShowError(fmt.Errorf("an error happened during sending transaction,\n%v", err), mainWindow)
+		responseErr := util.ErrorDetect(txHash)
+		if err != nil || responseErr {
+			dialog.ShowError(fmt.Errorf("an error happened during sending transaction,\n%v,\nApi response err: %v", err, responseErr), mainWindow)
 			if currentMainDialog != nil {
 				currentMainDialog.Hide()
 			}
 		} else {
-			waitForTxResult(txHash, creds)
+			waitForTxResult(txHash, creds, txCount)
 		}
 	}()
 }

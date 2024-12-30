@@ -215,9 +215,23 @@ func showNetworkSettingsWin(creds core.Credentials) {
 
 	bckbttn := widget.NewButtonWithIcon("", theme.CancelIcon(), func() { ntwrkStgsWin.Close() })
 	bttnContainer := container.NewGridWithColumns(2, bckbttn, saveButton)
-	ntwrkScroll := container.NewVBox(networkSelect, customNetworkSettingsForm, feeSettingsForm)
-	networkSettingsLyt := container.NewBorder(nil, bttnContainer, nil, nil, container.NewVScroll(ntwrkScroll))
-	ntwrkStgsWin.SetContent(networkSettingsLyt)
+	ntwrkContent := container.NewVBox(networkSelect, customNetworkSettingsForm, feeSettingsForm, bttnContainer)
+	ntwrkScroll := container.NewVScroll(ntwrkContent)
+
+	// feeLimitSliderMax.OnCursorChanged = func() {
+
+	// 	// time.AfterFunc(2000*time.Millisecond, func() {
+	// 	// 	// Adjust the delay as needed
+	// 	// 	// fmt.Println("ofset: ", ntwrkScroll.Offset)
+	// 	// 	// entryPos := feeLimitSliderMax.Position().Y
+	// 	// 	// fmt.Println("pos", entryPos) // this position never changes it needs to change relative to scroll position imo
+	// 	// 	// // ofsetPos := ntwrkScroll.Size().Height + entryPos
+	// 	// 	// ntwrkScroll.Offset = fyne.NewPos(0, entryPos-50)
+
+	// 	// })
+	// }
+
+	ntwrkStgsWin.SetContent(ntwrkScroll)
 	// currentMainDialog = dialog.NewCustomWithoutButtons("Network Settings", networkSettingsLyt, ntwrkStgsWin)
 	// currentMainDialog.Resize(fyne.NewSize(600, ntwrkStgsWin.Canvas().Size().Height-50))
 	ntwrkStgsWin.Show()

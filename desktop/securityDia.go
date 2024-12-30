@@ -25,7 +25,12 @@ func startLogoutTicker(timeout int) {
 	if logoutTicker != nil {
 		logoutTicker.Stop()
 	}
-	logoutTicker = time.NewTicker(time.Duration(timeout) * time.Minute)
+	timeout *= 60
+	if timeout <= 0 {
+		timeout = 1
+	}
+
+	logoutTicker = time.NewTicker(time.Duration(timeout) * time.Second)
 	go func() {
 		for range logoutTicker.C {
 			w := container.NewBorder(nil, nil, nil, nil)

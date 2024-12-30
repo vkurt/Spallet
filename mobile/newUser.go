@@ -56,7 +56,7 @@ func showWelcomePage() {
 
 func featuresPage() {
 	featuresHeader := widget.NewLabelWithStyle("Features of Spallet", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-	features := widget.NewRichTextFromMarkdown("1- Bugs, it means if you found a bug its a feature \n\n2- Nicknames and badges based on Staked soul\n\n3- Account migration from manage accounts menu\n\n4- Sending assets between your accounts\n\n5- Sending assets to address book recipients\n\n6-Collecting Master rewards\n\n7- Collecting Crown rewards\n\n8-Eligibility badges\n\n9-Detailed Account information\n\n10- Showing some chain statistics\n\n11- Detailed staking information under hodling tab\n\n12- Adjustable log in time out between 0-120 min\n\n13- Send assets to only known addresses\n\n14- Wallet backup/restore from restore point menu\n\n15- Custom network settings\n\n16- Auto update balances every 15 seconds\n\n17- Saturn Dex trading with routing, in amount estimation from user's desired out amount, price impact calculation\n\nalso some other things i forget :)\n\n **What we dont have in spallet**\n\n1- Phantasma link\n\n2- Showing Nft pictures and details (go SDK limitation and my limited knowledge)\n\n3- Burning tokens\n\nsome other things i dont remember\n\n**Planned Features**\n\nI've planned some features for this wallet, but hey, I'm doing this for fun. Feel free to use it as it is. Since it's open-sourced, you can fork it and continue its development or contribute its code if you like.")
+	features := widget.NewRichTextFromMarkdown("1- Bugs, it means if you found a bug its a feature \n\n2- Nicknames and badges based on Staked soul\n\n3- Account migration from manage accounts menu\n\n4- Sending assets between your accounts\n\n5- Sending assets to address book recipients\n\n6-Collecting Master rewards\n\n7- Collecting Crown rewards\n\n8-Eligibility badges\n\n9-Detailed Account information\n\n10- Showing some chain statistics\n\n11- Detailed staking information under hodling tab\n\n12- Adjustable log in time out between 0-120 min\n\n13- Send assets to only known addresses\n\n14- Custom network settings\n\n15- Auto update balances every 15 seconds\n\n16- Saturn Dex trading with routing, in amount estimation from user's desired out amount, price impact calculation\n\nalso some other things i forget :)\n\n **What we dont have in spallet**\n\n1- Phantasma link\n\n2- Showing Nft pictures and details (go SDK limitation and my limited knowledge)\n\n3- Burning tokens\n\nsome other things i dont remember\n\n**Planned Features**\n\nI've planned some features for this wallet, but hey, I'm doing this for fun. Feel free to use it as it is. Since it's open-sourced, you can fork it and continue its development or contribute its code if you like.")
 	features.Wrapping = fyne.TextWrapWord
 	scrollContent := container.NewVScroll(features)
 	continueBttn := widget.NewButton("Continue to wallet setup", func() {
@@ -391,7 +391,7 @@ func generateNewWalletPage(creds core.Credentials) {
 	keyPair := cryptography.NewPhantasmaKeys(pk)
 	privateKey := keyPair.WIF()
 	address := keyPair.Address().String()
-	addressShort := address[:9] + "..." + address[len(address)-9:]
+	addressShort := address[:24] + "\n" + address[24:]
 	nameEntry := widget.NewEntry()
 	nameEntry.SetText("Sparky Account 1")
 	nameEntry.TypedShortcut(&fyne.ShortcutSelectAll{})
@@ -443,7 +443,7 @@ func generateNewWalletPage(creds core.Credentials) {
 	formattedWif := privateKey[:18] + "\n" + privateKey[18:35] + "\n" + privateKey[35:]
 	copyWifButton := widget.NewButtonWithIcon(formattedWif, theme.ContentCopyIcon(), func() {
 		fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(privateKey)
-		dialog.ShowInformation("Copied", "Private Key (WIF) copied to clipboard", mainWindow)
+		dialog.ShowInformation("Copied", "Private Key copied to clipboard", mainWindow)
 		wifCopied = true // Enable the Continue button after WIF is copied
 		updateokBttnState()
 	})
@@ -462,7 +462,7 @@ func generateNewWalletPage(creds core.Credentials) {
 	generatedAccForm := widget.NewForm(
 		widget.NewFormItem("Name", nameEntry),
 		widget.NewFormItem("Address", widget.NewLabel(addressShort)),
-		widget.NewFormItem("Private Key (Wif)", copyWifButton),
+		widget.NewFormItem("Private Key", copyWifButton),
 		widget.NewFormItem("Seed Phrase", copyMnemonicButton),
 	)
 	warning := widget.NewLabelWithStyle("⚠️In order to continue please copy your Wif and Seed Phrase and store them in a safe place⚠️", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
@@ -479,6 +479,10 @@ func generateNewWalletPage(creds core.Credentials) {
 // Function to Show Import WIF Page
 func showImportAccountPage(creds core.Credentials) {
 	wifOrSeedEntry := widget.NewEntry()
+	pasteBtn := widget.NewButtonWithIcon("", theme.ContentPasteIcon(), func() {
+		wifOrSeedEntry.SetText(spallet.Driver().AllWindows()[0].Clipboard().Content())
+	})
+	entryBox := container.NewBorder(nil, nil, nil, pasteBtn, wifOrSeedEntry)
 	walletNameEntry := widget.NewEntry()
 	walletNameEntry.SetText("Sparky Account 1")
 	walletNameEntry.TypedShortcut(&fyne.ShortcutSelectAll{})
@@ -530,7 +534,7 @@ func showImportAccountPage(creds core.Credentials) {
 	importButton.Disabled()
 	wifOrSeedEntryForm := widget.NewForm(
 		widget.NewFormItem("Name", walletNameEntry),
-		widget.NewFormItem("Wif Or Seed Phrase", wifOrSeedEntry),
+		widget.NewFormItem("Wif Or Seed Phrase", entryBox),
 	)
 
 	updateImportBttnState := func() {

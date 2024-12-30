@@ -137,11 +137,12 @@ func swapGui(creds core.Credentials) {
 
 			dialog.ShowConfirm("Confirm Swap", confirmMessage, func(confirmed bool) {
 				if confirmed {
+					txCount := core.LatestAccountData.TransactionCount
 					txHash, err := core.ExecuteSwap(dexTransaction, currentDexSlippage, creds, currentDexFeeLimit, dexPayload)
 					if err != nil {
 						dialog.ShowError(err, mainWindow)
 					} else {
-						go monitorSwapTransaction(txHash, creds)
+						go monitorSwapTransaction(txHash, creds, txCount)
 					}
 				}
 			}, mainWindow)
@@ -716,7 +717,7 @@ func swapGui(creds core.Credentials) {
 
 }
 
-func monitorSwapTransaction(txHash string, creds core.Credentials) {
+func monitorSwapTransaction(txHash string, creds core.Credentials, txCount int) {
 	maxRetries := 12 // 2 secs of block time so we are waiting for 3 block and that is enough
 	retryCount := 0
 	retryDelay := time.Millisecond * 500
@@ -727,7 +728,7 @@ func monitorSwapTransaction(txHash string, creds core.Credentials) {
 		if retryCount >= maxRetries {
 			fmt.Printf("Transaction monitoring timed out after %d retries\n", maxRetries)
 
-			showTxResultDialog("Transaction monitoring timed out.", creds, response.TransactionResult{Hash: txHash, Fee: "0"})
+			showTxResultDialog("Transaction monitoring timed out.", creds, response.TransactionResult{Hash: txHash, Fee: "0"}, txCount)
 			swapGui(creds)
 			swapTab.Content.Refresh()
 
@@ -745,7 +746,7 @@ func monitorSwapTransaction(txHash string, creds core.Credentials) {
 				continue
 			}
 
-			showTxResultDialog("Failed to get transaction status.", creds, response.TransactionResult{Hash: txHash, Fee: "0"})
+			showTxResultDialog("Failed to get transaction status.", creds, response.TransactionResult{Hash: txHash, Fee: "0"}, txCount)
 
 			swapGui(creds)
 			swapTab.Content.Refresh()
@@ -756,7 +757,7 @@ func monitorSwapTransaction(txHash string, creds core.Credentials) {
 		if txResult.StateIsSuccess() {
 			fmt.Printf("Transaction successful\n")
 
-			showTxResultDialog("Swap completed successfully.", creds, txResult)
+			showTxResultDialog("Swap completed successfully.", creds, txResult, txCount)
 
 			swapGui(creds)
 			swapTab.Content.Refresh()
@@ -765,7 +766,7 @@ func monitorSwapTransaction(txHash string, creds core.Credentials) {
 		}
 		if txResult.StateIsFault() {
 			fmt.Printf("Transaction failed\n")
-			showTxResultDialog("Swap failed.", creds, txResult)
+			showTxResultDialog("Swap failed.", creds, txResult, txCount)
 
 			swapGui(creds)
 			swapTab.Content.Refresh()

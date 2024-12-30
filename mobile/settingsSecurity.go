@@ -303,13 +303,10 @@ func showSecurityWin(creds core.Credentials) {
 		// 	}
 
 		// })
-
-		securityFormContent.Content = securityForm
-
 		securityButtons := container.NewGridWithColumns(2, exitBttn, saveBttn)
-		securityFormLayout := container.NewBorder(nil, securityButtons, nil, nil, securityFormContent)
+		securityFormContent.Content = container.NewVBox(securityForm, securityButtons)
 
-		scrtyStgsWin.SetContent(securityFormLayout)
+		scrtyStgsWin.SetContent(securityFormContent)
 		scrtyStgsWin.Resize(mainWindow.Canvas().Content().Size())
 		scrtyStgsWin.Show()
 
