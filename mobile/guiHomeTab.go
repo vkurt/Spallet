@@ -26,15 +26,13 @@ func homeGui(creds core.Credentials) {
 	})
 
 	if core.LatestAccountData.OnChainName == "anonymous" && core.LatestAccountData.IsStaker {
-		onChainNameText = "You can forge it from hodling tab"
+		onChainNameText = "You can forge a name from hodling tab"
 	} else if core.LatestAccountData.OnChainName != "anonymous" {
 		onChainNameText = core.LatestAccountData.OnChainName
 	} else {
-		onChainNameText = "This account is not eligible"
+		onChainNameText = "Stakers can forge a name."
 	}
-	onChainNameLabel := widget.NewLabel(fmt.Sprintf("Address On chain name:\n\t%v", onChainNameText))
-	onChainNameLabel.Wrapping = fyne.TextWrapWord
-
+	nameMessage := widget.NewLabelWithStyle(fmt.Sprintf("%s\n%s", core.LatestAccountData.NickName, onChainNameText), fyne.TextAlignCenter, fyne.TextStyle{Bold: false})
 	settingsBtn := widget.NewButtonWithIcon("", theme.SettingsIcon(), func() {
 		network := widget.NewButton("Network", func() {
 			showNetworkSettingsWin(creds)
@@ -75,7 +73,7 @@ func homeGui(creds core.Credentials) {
 		}
 	})
 	walletInfoGroupLyt := container.NewBorder(nil, nil, walletSelect, walletExpBtn, addressCopyBtn)
-	homeContent := container.NewVScroll(container.NewVBox(walletInfoGroupLyt, onChainNameLabel, buttonsContainer, badges, tokenBtns))
+	homeContent := container.NewVScroll(container.NewVBox(nameMessage, walletInfoGroupLyt, buttonsContainer, badges, tokenBtns))
 	// homeContent.SetMinSize()
 	homeTab.Content = homeContent
 	homeTab.Content.Refresh()

@@ -450,6 +450,42 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 
 		}
 
+		fmt.Println("accKcalBoost accIsSoulMaster ", LatestAccountData.KcalBoost, LatestAccountData.IsSoulMaster)
+
+		accSoulAmount := LatestAccountData.FungibleTokens["SOUL"].Amount
+
+		if accSoulAmount == nil {
+			accSoulAmount = big.NewInt(0)
+		}
+		if LatestAccountData.KcalBoost == 100 && LatestAccountData.IsSoulMaster {
+			LatestAccountData.BadgeName = "lord"
+			LatestAccountData.NickName = "Spark Lord 🔥"
+		} else if LatestAccountData.KcalBoost > 0 && LatestAccountData.IsSoulMaster {
+			LatestAccountData.BadgeName = "master"
+			LatestAccountData.NickName = "Spark Master 💥"
+
+		} else if LatestAccountData.IsSoulMaster {
+			LatestAccountData.BadgeName = "apprentice"
+			LatestAccountData.NickName = "Spark Apprentice ✨"
+
+		} else if accSoulAmount.Cmp(big.NewInt(100000000)) > 0 && LatestAccountData.StakedBalances.Amount.Cmp(big.NewInt(100000000)) >= 0 {
+			LatestAccountData.BadgeName = "snoozer"
+			LatestAccountData.NickName = "Soul slacker 😴"
+
+		} else if LatestAccountData.IsStaker {
+			LatestAccountData.BadgeName = "acolyte"
+			LatestAccountData.NickName = "Spark Acolyte ⚡️"
+
+		} else if accSoulAmount.Cmp(big.NewInt(100000000)) >= 0 && LatestAccountData.OnChainName == "anonymous" {
+			LatestAccountData.BadgeName = "snoozer"
+			LatestAccountData.NickName = "Soul snoozer💤"
+
+		} else if LatestAccountData.StakedBalances.Amount.Cmp(big.NewInt(100000000)) < 0 && accSoulAmount.Cmp(big.NewInt(100000000)) < 0 {
+			LatestAccountData.BadgeName = "wanderer"
+			LatestAccountData.NickName = "Soulless wanderer 🌑"
+
+		}
+
 	}
 	// saveLatestAccountData("accountdata", creds, LatestAccountData)
 	return nil

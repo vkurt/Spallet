@@ -80,36 +80,6 @@ func buildAndShowAccInfo(creds core.Credentials) {
 	// fmt.Println("accIsStaker ", accIsStaker)
 	// fmt.Println("accOnChainName ", accOnChainName)
 
-	fmt.Println("accKcalBoost accIsSoulMaster ", core.LatestAccountData.KcalBoost, core.LatestAccountData.IsSoulMaster)
-	if core.LatestAccountData.KcalBoost == 100 && core.LatestAccountData.IsSoulMaster {
-		core.LatestAccountData.BadgeName = "lord"
-		core.LatestAccountData.NickName = "Spark Lord 🔥"
-	} else if core.LatestAccountData.KcalBoost > 0 && core.LatestAccountData.IsSoulMaster {
-		core.LatestAccountData.BadgeName = "master"
-		core.LatestAccountData.NickName = "Spark Master 💥"
-
-	} else if core.LatestAccountData.IsSoulMaster {
-		core.LatestAccountData.BadgeName = "apprentice"
-		core.LatestAccountData.NickName = "Spark Apprentice ✨"
-
-	} else if accSoulAmount.Cmp(big.NewInt(100000000)) > 0 && core.LatestAccountData.StakedBalances.Amount.Cmp(big.NewInt(100000000)) >= 0 {
-		core.LatestAccountData.BadgeName = "snoozer"
-		core.LatestAccountData.NickName = "Soul slacker 😴"
-
-	} else if core.LatestAccountData.IsStaker {
-		core.LatestAccountData.BadgeName = "acolyte"
-		core.LatestAccountData.NickName = "Spark Acolyte ⚡️"
-
-	} else if accSoulAmount.Cmp(big.NewInt(100000000)) >= 0 && core.LatestAccountData.OnChainName == "anonymous" {
-		core.LatestAccountData.BadgeName = "snoozer"
-		core.LatestAccountData.NickName = "Soul snoozer💤"
-
-	} else if core.LatestAccountData.StakedBalances.Amount.Cmp(big.NewInt(100000000)) < 0 && accSoulAmount.Cmp(big.NewInt(100000000)) < 0 {
-		core.LatestAccountData.BadgeName = "wanderer"
-		core.LatestAccountData.NickName = "Soulless wanderer 🌑"
-
-	}
-
 	accSummaryInfo := fmt.Sprintf("Local Name:\t%s\nOn Chain Name:\t%v\nNick name:\t\t%v\nAddress:\t\t%s\nHave %v token(s), %v NFT(s) from %v collections",
 		creds.LastSelectedWallet, core.LatestAccountData.OnChainName, core.LatestAccountData.NickName, creds.Wallets[creds.LastSelectedWallet].Address, core.LatestAccountData.TokenCount, core.LatestAccountData.TotalNft, core.LatestAccountData.NftTypes)
 
