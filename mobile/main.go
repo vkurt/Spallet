@@ -66,14 +66,22 @@ func main() {
 	spallet.Lifecycle().SetOnEnteredForeground(func() {
 		activeTime := time.Now()
 		if logged && activeTime.Unix() > timeOut {
-			closeAllWindowsAndDialogs()
+
 			showExistingUserLogin()
+		}
+		if logoutTicker != nil {
+			logoutTicker.Stop()
 		}
 
 	})
 	spallet.Lifecycle().SetOnExitedForeground(func() {
 		passiveTime := time.Now()
 		timeOut = passiveTime.Unix() + int64(core.UserSettings.LgnTmeOut)*60
+		if logged && core.UserSettings.LgnTmeOut > 0 {
+			startLogoutTicker(core.UserSettings.LgnTmeOut)
+		} else {
+			showExistingUserLogin()
+		}
 	})
 
 	fmt.Println("Root Path: ", rootPath)
@@ -105,7 +113,10 @@ func main() {
 }
 
 func showExistingUserLogin() {
-
+	closeAllWindowsAndDialogs()
+	if logoutTicker != nil {
+		logoutTicker.Stop()
+	}
 	if updateBalanceTimeOut != nil {
 		updateBalanceTimeOut.Stop()
 	}

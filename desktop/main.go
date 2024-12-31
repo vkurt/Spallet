@@ -41,6 +41,7 @@ var page = uint(1)
 var mainPayload = "Spallet"
 var spallet fyne.App
 var rootPath = ""
+var loggedIn bool
 
 func main() {
 
@@ -55,7 +56,14 @@ func main() {
 
 	})
 	spallet.Lifecycle().SetOnExitedForeground(func() {
-		startLogoutTicker(core.UserSettings.LgnTmeOut)
+
+		if loggedIn && core.UserSettings.LgnTmeOut > 0 {
+
+			startLogoutTicker(core.UserSettings.LgnTmeOut)
+		} else {
+			showExistingUserLogin()
+		}
+
 	})
 
 	firstTime := !core.FileExists("data/essential/credentials.spallet")
@@ -142,6 +150,8 @@ func updateWalletInfo(creds core.Credentials, walletInfo *fyne.Container) {
 }
 
 func showExistingUserLogin() {
+	loggedIn = false
+	closeAllWindowsAndDialogs()
 	if logoutTicker != nil {
 		logoutTicker.Stop()
 	}
@@ -220,6 +230,7 @@ func showExistingUserLogin() {
 				core.LatestTokenData.AllTokenUpdateTime = time.Now().UTC().Unix()
 				core.LatestTokenData.AccTokenUpdateTime = time.Now().UTC().Unix()
 				mainWindow(creds)
+				loggedIn = true
 				closeUpdatingDialog()
 
 			}

@@ -33,16 +33,29 @@ func startLogoutTicker(timeout int) {
 	logoutTicker = time.NewTicker(time.Duration(timeout) * time.Second)
 	go func() {
 		for range logoutTicker.C {
-			w := container.NewBorder(nil, nil, nil, nil)
-			mainWindowGui.SetContent(w)
-			if currentMainDialog != nil {
-				currentMainDialog.Hide()
-			}
-			currentMainDialog = dialog.NewInformation("Log in time out", "Please log in", mainWindowGui)
-			currentMainDialog.Show()
+
 			showExistingUserLogin()
 		}
 	}()
+}
+
+func closeAllWindowsAndDialogs() {
+	for _, window := range spallet.Driver().AllWindows() {
+		if window.Title() != "Spallet Mobile" {
+			window.Close()
+		}
+	}
+	if currentMainDialog != nil {
+		currentMainDialog.Hide()
+
+	}
+	if pwdDia != nil {
+		pwdDia.Hide()
+	}
+	if updatingDialog != nil {
+		updatingDialog.Hide()
+	}
+
 }
 
 func openSecurityDia(creds core.Credentials) {

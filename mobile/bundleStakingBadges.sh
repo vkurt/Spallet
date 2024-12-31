@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the folder containing your images (use Unix-style paths)
-IMAGE_FOLDER="/e/1-Development/AppDeveloping/SpalletTry/assets/img/stats/staking"
+IMAGE_FOLDER="../assets/img/stats/staking"
 OUTPUT_FILE="bundledStakingIcons.go"
 
 # Ensure fyne is available

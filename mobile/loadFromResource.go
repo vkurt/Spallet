@@ -3,7 +3,6 @@ package main
 import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/theme"
 )
 
 func loadImgFromResource(imgName string, imgSize fyne.Size) *canvas.Image {
@@ -25,8 +24,32 @@ func getResourceByName(name string) fyne.Resource {
 		return resourceHodlPng
 	case "history":
 		return resourceHistoryPng
+	case "KCAL":
+		return resourceKCALPng
+	case "SOUL":
+		return resourceSOULPng
+	case "CROWN":
+		return resourceCROWNPng
+	case "RAA":
+		return resourceRAAPng
+	case "BRC":
+		return resourceBRCPng
+	case "GAME":
+		return resourceGAMEPng
+	case "GHOST":
+		return resourceGHOSTPng
+	case "GOATI":
+		return resourceGOATIPng
+	case "MKNI":
+		return resourceMKNIPng
+	case "SNFT":
+		return resourceSNFTPng
+	case "TIGER":
+		return resourceTIGERPng
+	case "TTRS":
+		return resourceTTRSPng
 	default:
-		return theme.BrokenImageIcon()
+		return resourcePlaceholderPng
 
 	}
 

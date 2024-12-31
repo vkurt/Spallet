@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the folder containing your images (use Unix-style paths)
-IMAGE_FOLDER="/e/1-Development/AppDeveloping/SpalletTry/assets/img/icons/tab"
+IMAGE_FOLDER="../assets/img/icons/tab"
 OUTPUT_FILE="bundledTabIcons.go"
 
 # Ensure fyne is available

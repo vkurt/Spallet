@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define the folder containing your images (use Unix-style paths)
-IMAGE_FOLDER="../assets/img/stats/network"
-OUTPUT_FILE="bundledNetworkIcons.go"
+IMAGE_FOLDER="../assets/img/icons/tokens"
+OUTPUT_FILE="bundledTokenIcons.go"
 
 # Ensure fyne is available
 if ! command -v fyne &> /dev/null

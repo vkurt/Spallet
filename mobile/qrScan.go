@@ -12,7 +12,7 @@ package main
 // 	"gocv.io/x/gocv"
 // )
 
-// func scanQr() { //Sadly this is not possible with current tools for go language only option using gomobile package  and using all go code like backend code and redesign eveything with kotlin/java
+// func scanQr() { //Sadly this is not possible with current gocv package because it didnot supports any mobile, only option using gomobile package and using all go code like backend code
 // 	// Initialize a
 // 	w := spallet.NewWindow("QR Code Scanner")
 

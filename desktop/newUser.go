@@ -685,6 +685,7 @@ func startWallet(creds core.Credentials) error {
 		core.UpdateOrCheckTokenCache("", 3, "chain", rootPath)
 		core.DataFetch(creds, rootPath)
 		mainWindow(creds)
+		loggedIn = true
 		closeUpdatingDialog()
 
 		autoUpdate(updateInterval, creds, rootPath)
