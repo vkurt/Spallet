@@ -79,7 +79,7 @@ func main() {
 		timeOut = passiveTime.Unix() + int64(core.UserSettings.LgnTmeOut)*60
 		if logged && core.UserSettings.LgnTmeOut > 0 {
 			startLogoutTicker(core.UserSettings.LgnTmeOut)
-		} else {
+		} else if logged {
 			showExistingUserLogin()
 		}
 	})

@@ -60,7 +60,7 @@ func main() {
 		if loggedIn && core.UserSettings.LgnTmeOut > 0 {
 
 			startLogoutTicker(core.UserSettings.LgnTmeOut)
-		} else {
+		} else if loggedIn {
 			showExistingUserLogin()
 		}
 
