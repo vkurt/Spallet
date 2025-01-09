@@ -67,10 +67,10 @@ func buildAndShowChainStatistics() {
 	// Kcal 2025 calculations
 	// SOUL SUPPLY 124 129 197.66163057
 	// KCAL 207 602 775.3940180069
-	// BURNED	935 293.2819919151 2025 01 01 01:00 ( 1735693200 )
+	// BURNED	935 293.2819919151 2025 01 01 01:00 gmt+3( 1735682400 )
 	kcalSupplyChangeSince2025 := new(big.Int).Sub(&kcalSupplyRawBigint, big.NewInt(2076027753940180069))
 	burnedKcalSupply2025 := new(big.Int).Sub(&kcalBurnedSupplyRawBigint, big.NewInt(9352932819919151))
-	daysPassedSince2025 := (currentTime - 1735693200) / 86400
+	daysPassedSince2025 := (currentTime - 1735682400) / 86400
 	averageDailyKcalClaimSince2025 := new(big.Int).Div(new(big.Int).Add(kcalSupplyChangeSince2025, burnedKcalSupply2025), big.NewInt(daysPassedSince2025))
 	averageDailyKcalBurnSince2025 := new(big.Int).Div(burnedKcalSupply2025, big.NewInt(daysPassedSince2025))
 
