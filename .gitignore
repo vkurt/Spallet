@@ -9,3 +9,8 @@
 *.exe
 *.out
 *.apk
+
+# Ignore folders
+desktop/img/
+desktop/data/
+mobile/data/

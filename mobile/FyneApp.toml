@@ -2,5 +2,5 @@
   Icon = "icon.png"
   Name = "Spallet"
   ID = "com.spallet.app"
-  Version = "0.6.1"
-  Build = 2
+  Version = "0.6.2"
+  Build = 100

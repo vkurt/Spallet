@@ -122,7 +122,7 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 
 	} else if LatestAccountData.Network != UserSettings.NetworkName {
 		fetchAccData = true
-
+		LatestChainStatisticsData.DataFetchTime = currentUtcTime.Unix() - 3600
 		LatestAccountData = AccountInfoData{
 			FungibleTokens: make(map[string]AccToken),
 			NonFungible:    make(map[string]AccToken),
@@ -206,10 +206,12 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 		// 	delete(accTokenBalances, k)
 		// }
 
-		stakedSoulBalance := big.NewInt(0)
-		stakedSoulBalance.SetString(account.Stakes.Amount, 10)
+		stakedSoulBalance, ok := new(big.Int).SetString(account.Stakes.Amount, 10)
+		if !ok {
+			stakedSoulBalance.SetInt64(0)
+		}
 		if stakedSoulBalance == nil {
-			stakedSoulBalance = big.NewInt(0)
+			stakedSoulBalance.SetInt64(0)
 		}
 
 		if stakedSoulBalance.Cmp(SoulMasterThreshold) >= 0 {
@@ -228,13 +230,13 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 		}
 		fmt.Printf("staked soul: %v \nSoul master: %v\nSoulmaster threshold: %v \n", stakedSoulBalance.String(), LatestAccountData.IsSoulMaster, SoulMasterThreshold)
 
-		unclaimedKcal := big.NewInt(0)
-		unclaimedKcal.SetString(account.Stakes.Unclaimed, 10)
-		if stakedSoulBalance == nil {
-			stakedSoulBalance = big.NewInt(0)
+		unclaimedKcal, ok := new(big.Int).SetString(account.Stakes.Unclaimed, 10)
+		if !ok {
+			unclaimedKcal.SetInt64(0)
 		}
+
 		if unclaimedKcal == nil {
-			unclaimedKcal = big.NewInt(0)
+			unclaimedKcal.SetInt64(0)
 		}
 		LatestAccountData.StakedBalances = Stake{
 			Amount:    stakedSoulBalance,
@@ -292,7 +294,7 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 					Chain:    token.Chain,
 					Ids:      token.Ids,
 				}
-				if token.Symbol == "Phantasma Crown" {
+				if token.Symbol == "CROWN" {
 					crownAmount, _ = strconv.Atoi(token.Amount)
 
 				}

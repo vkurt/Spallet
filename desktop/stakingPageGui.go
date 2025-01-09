@@ -34,7 +34,7 @@ func showStakingPage(creds core.Credentials) {
 	onChainNameLabel := widget.NewLabel(fmt.Sprintf("Address On chain name:\n\t%v", onChainNameText))
 
 	// Claiming Kcal stuff
-	remainedTimeForKcalGenLabel := widget.NewLabel(fmt.Sprintf("Time until next forging Ritual:\n\t%v", core.FormatDuration(time.Duration(core.LatestAccountData.RemainedTimeForKcalGen)*time.Second)))
+	remainedTimeForKcalGenLabel := widget.NewLabel(fmt.Sprintf("Spark forging ritual after:\n\t%v (%v)", core.FormatDuration(time.Duration(core.LatestAccountData.RemainedTimeForKcalGen)*time.Second), time.Unix((core.LatestAccountData.RemainedTimeForKcalGen+time.Now().Unix()), 0).Local()))
 	remainedTimeForKcalGenLabel.Wrapping = fyne.TextWrapWord
 	unclaimedBalanceLabel := widget.NewLabel(fmt.Sprintf("Earned Sparks:\n\t%s Kcal", core.FormatBalance(core.LatestAccountData.StakedBalances.Unclaimed, core.KcalDecimals)))
 	// unclaimedBalanceLabel.Wrapping = fyne.TextWrapWord
@@ -119,7 +119,7 @@ func showStakingPage(creds core.Credentials) {
 	if waitingPeriod == 0 {
 		waitingMessage = "You can drain Speck's Soul"
 	} else {
-		waitingMessage = core.FormatDuration(time.Duration(core.LatestAccountData.RemainedTimeForUnstake) * time.Second)
+		waitingMessage = fmt.Sprintf("%v (%v)", core.FormatDuration(time.Duration(core.LatestAccountData.RemainedTimeForUnstake)*time.Second), time.Unix((core.LatestAccountData.RemainedTimeForUnstake+time.Now().Unix()), 0))
 	}
 
 	remainedTimeForUnstakeLabel := widget.NewLabel(fmt.Sprintf("Clan's Waiting Period:\n\t%v", waitingMessage))
@@ -574,7 +574,7 @@ func showStakingPage(creds core.Credentials) {
 	smRwrdButton.Disable()
 	lastMasterClaimTimeStamp := time.Unix(core.LatestChainStatisticsData.LastMasterClaimTimestamp, 0)
 	if core.LatestAccountData.IsEligibleForCurrentSmReward { //remained time for current reward if address eligible for current
-		now := time.Now()
+		now := time.Now().UTC()
 		location := now.Location()
 
 		// Get the first day of the next month
@@ -592,11 +592,11 @@ func showStakingPage(creds core.Credentials) {
 			smRwrdButton.Enable()
 			countdownForSmRw = "The time has come"
 		} else {
-			countdownForSmRw = fmt.Sprintf("%dd %dh %dm %ds", days, hours, minutes, seconds)
+			countdownForSmRw = fmt.Sprintf("%dd %dh %dm %ds (%v)", days, hours, minutes, seconds, time.Unix(int64(countdown), 0).Local())
 		}
 
 	} else if core.LatestAccountData.IsSoulMaster { // remained time for next months reward becaue it is not eligible for curent reward
-		now := time.Now()
+		now := time.Now().UTC()
 		// Get the first day of the month after the next month
 		firstDayNextClaim := time.Date(now.Year(), now.Month()+2, 1, 0, 0, 0, 0, time.UTC)
 		// Calculate the last day of the next month
@@ -612,7 +612,7 @@ func showStakingPage(creds core.Credentials) {
 			smRwrdButton.Enable()
 			countdownForSmRw = "The time has come"
 		} else {
-			countdownForSmRw = fmt.Sprintf("%dd %dh %dm %ds", days, hours, minutes, seconds)
+			countdownForSmRw = fmt.Sprintf("%dd %dh %dm %ds (%v)", days, hours, minutes, seconds, time.Unix(int64(countdown), 0).Local())
 		}
 		// fmt.Println("Time left until the end of next month:", countdownForSmRw)
 	}
@@ -677,7 +677,7 @@ func showStakingPage(creds core.Credentials) {
 	crwnRwrdButton.Disable()
 
 	if core.LatestAccountData.IsEligibleForCurrentCrown { //REmained time for current crown if eligible for current reward
-		now := time.Now()
+		now := time.Now().UTC()
 		predettime := time.Unix(core.LatestChainStatisticsData.NextInfTimeStamp, 0)
 		countdown := predettime.Sub(now)
 
@@ -689,12 +689,12 @@ func showStakingPage(creds core.Credentials) {
 			crwnRwrdButton.Enable()
 			countdownForCrwn = "The time has come"
 		} else {
-			countdownForCrwn = fmt.Sprintf("%dd %dh %dm %ds", days, hours, minutes, seconds)
+			countdownForCrwn = fmt.Sprintf("%dd %dh %dm %ds (%v) ", days, hours, minutes, seconds, time.Unix(int64(countdown), 0).Local())
 		}
 
 	} else if core.LatestAccountData.IsSoulMaster { //remained time for next crown
 
-		now := time.Now()
+		now := time.Now().UTC()
 		predettime := time.Unix(core.LatestChainStatisticsData.NextInfTimeStamp+90*86400, 0)
 
 		countdown := predettime.Sub(now)
@@ -707,12 +707,12 @@ func showStakingPage(creds core.Credentials) {
 			crwnRwrdButton.Enable()
 			countdownForCrwn = "The time has come"
 		} else {
-			countdownForCrwn = fmt.Sprintf("%dd %dh %dm %ds", days, hours, minutes, seconds)
+			countdownForCrwn = fmt.Sprintf("%dd %dh %dm %ds (%v)", days, hours, minutes, seconds, time.Unix(int64(countdown), 0).Local())
 		}
 
 	}
 	remanedTimeForGetttingCrownLabel := widget.NewLabel(fmt.Sprintf("Coronation after:\n\t%s", countdownForCrwn))
-	remainedTimeForGettingSoulMasterRewardLabel := widget.NewLabel(fmt.Sprintf("Mastery Awaiting Time:\n\t%s", countdownForSmRw))
+	remainedTimeForGettingSoulMasterRewardLabel := widget.NewLabel(fmt.Sprintf("Mastery Awaiting Time:\n\t%s ", countdownForSmRw))
 
 	stakeUnstakeBttn := widget.NewButton("Drain/Power Up Specky", func() {
 		currentMainDialog = dialog.NewCustomWithoutButtons("Drain/Power Up Specky", stakeContainer, mainWindowGui)
