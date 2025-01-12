@@ -98,13 +98,13 @@ func buildAndShowChainStatistics() {
 
 	if core.UserSettings.NetworkName != "mainnet" {
 
-		kcalInfo = fmt.Sprintf("Statistics since 2025\n\tonly for mainnet\n\nStatistics Since Mainnet Launch\n\tAverage Daily Burn\t%s\n\tAverage Daily Claims\t%s Kcal\n\tAnnual supply growth\t%.2f%%\n\nAbsolute maximum calculations\n\tFully boosted soul masters\t%.0f\n\tBoosted Kcal Generation\t%s Kcal\n\tBoosted Soul Supply Ratio\t%.2f%%\n\tAnnual supply growth\t\t%.2f%%",
+		kcalInfo = fmt.Sprintf("Statistics since 2025\n\tonly for mainnet\n\nStatistics Since Mainnet Launch\n\tAverage Daily Burn\t%s Kcal\n\tAverage Daily Claims\t%s Kcal\n\tAnnual supply growth\t%.2f%%\n\nAbsolute maximum calculations\n\tFully boosted soul masters\t%.0f\n\tBoosted Kcal Generation\t%s Kcal\n\tBoosted Soul Supply Ratio\t%.2f%%\n\tAnnual supply growth\t\t%.2f%%",
 			core.FormatBalance(averageDailyKcalBurnSinceMainnetLaunch, core.KcalDecimals), core.FormatBalance(averageDailyKcalClaimsSinceMainnetLaunch, core.KcalDecimals), averageYearlyKcalSupplyGrowthRateSinceMainnetLaunchFloat,
 			maxFullyBoostedSoulmasterFloat64, core.FormatBalance(estimatedBoostedDailyKcalGenerationInt, core.KcalDecimals), boostedStakedSupplyRatio, annualKcalSupplyGrowthRateMaxFloat,
 		)
 
 	} else {
-		kcalInfo = fmt.Sprintf("Statistics since 2025\n\tCirc. supply change\t%s Kcal\n\tBurned Suppy\t\t%s Kcal\n\tAverage Daily Burn\t%s Kcal\n\tAverage Daily Claims\t%s Kcal\n\tAnnual supply growth\t%.2f%%\n\nStatistics Since Mainnet Launch\n\tAverage Daily Burn\t%s\n\tAverage Daily Claims\t%s Kcal\n\tAnnual supply growth\t%.2f%%\n\nAbsolute maximum calculations\n\tFully boosted soul masters\t%.0f\n\tBoosted Kcal Generation\t%s Kcal\n\tBoosted Soul Supply Ratio\t%.2f%%\n\tAnnual supply growth\t\t%.2f%%",
+		kcalInfo = fmt.Sprintf("Statistics since 2025\n\tCirc. supply change\t%s Kcal\n\tBurned Suppy\t\t%s Kcal\n\tAverage Daily Burn\t%s Kcal\n\tAverage Daily Claims\t%s Kcal\n\tAnnual supply growth\t%.2f%%\n\nStatistics Since Mainnet Launch\n\tAverage Daily Burn\t%s Kcal\n\tAverage Daily Claims\t%s Kcal\n\tAnnual supply growth\t%.2f%%\n\nAbsolute maximum calculations\n\tFully boosted soul masters\t%.0f\n\tBoosted Kcal Generation\t%s Kcal\n\tBoosted Soul Supply Ratio\t%.2f%%\n\tAnnual supply growth\t\t%.2f%%",
 			core.FormatBalance(kcalSupplyChangeSince2025, core.KcalDecimals), core.FormatBalance(burnedKcalSupply2025, core.KcalDecimals), core.FormatBalance(averageDailyKcalBurnSince2025, core.KcalDecimals), core.FormatBalance(averageDailyKcalClaimSince2025, core.KcalDecimals), averageYearlyKcalSupplyGrowthRateSince2025Float,
 			core.FormatBalance(averageDailyKcalBurnSinceMainnetLaunch, core.KcalDecimals), core.FormatBalance(averageDailyKcalClaimsSinceMainnetLaunch, core.KcalDecimals), averageYearlyKcalSupplyGrowthRateSinceMainnetLaunchFloat,
 			maxFullyBoostedSoulmasterFloat64, core.FormatBalance(estimatedBoostedDailyKcalGenerationInt, core.KcalDecimals), boostedStakedSupplyRatio, annualKcalSupplyGrowthRateMaxFloat,

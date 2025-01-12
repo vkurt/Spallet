@@ -41,7 +41,7 @@ func startLogoutTicker(timeout int) {
 
 func closeAllWindowsAndDialogs() {
 	for _, window := range spallet.Driver().AllWindows() {
-		if window.Title() != "Spallet Mobile" {
+		if window.Title() != "Spallet" {
 			window.Close()
 		}
 	}

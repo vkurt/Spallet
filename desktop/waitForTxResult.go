@@ -89,8 +89,9 @@ func showTxResultDialog(header string, creds core.Credentials, txResult response
 	if currentMainDialog != nil {
 		currentMainDialog.Hide()
 	}
-	resultDia.Show()
 	closeUpdatingDialog()
+	resultDia.Show()
+
 	if txResult.StateIsSuccess() {
 		for i := 0; i < 40; i++ {
 			fmt.Println("Checking tx count")
