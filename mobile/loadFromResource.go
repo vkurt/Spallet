@@ -48,6 +48,8 @@ func getResourceByName(name string) fyne.Resource {
 		return resourceTIGERPng
 	case "TTRS":
 		return resourceTTRSPng
+	case "TAZZ":
+		return resourceTAZZPng
 	default:
 		return resourcePlaceholderPng
 
