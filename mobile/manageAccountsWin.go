@@ -16,10 +16,10 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/cosmos/go-bip39"
 	"github.com/phantasma-io/phantasma-go/pkg/blockchain"
 	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
 	scriptbuilder "github.com/phantasma-io/phantasma-go/pkg/vm/script_builder"
-	"github.com/tyler-smith/go-bip39"
 )
 
 func manageAccountsDia(creds core.Credentials) {
@@ -356,9 +356,9 @@ func manageAccountsDia(creds core.Credentials) {
 
 								expire := time.Now().UTC().Add(time.Second * 300).Unix()
 								sb := scriptbuilder.BeginScript()
-								sb.AllowGas(keyPair.Address().String(), cryptography.NullAddress().String(), core.UserSettings.GasPrice, migAccFeeLimit)
-								sb.CallContract("account", "migrate", keyPair.Address().String(), migToAccAddr)
-								sb.SpendGas(keyPair.Address().String())
+								sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().Text(), core.UserSettings.GasPrice, migAccFeeLimit)
+								sb.CallContract("account", "migrate", keyPair.Address().Text(), migToAccAddr)
+								sb.SpendGas(keyPair.Address().Text())
 								script := sb.EndScript()
 
 								tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Account Migration"))
@@ -496,7 +496,7 @@ func manageAccountsDia(creds core.Credentials) {
 						genKeyPair := cryptography.NewPhantasmaKeys(pk)
 
 						genPrivateKey := genKeyPair.WIF()
-						genAddress := genKeyPair.Address().String()
+						genAddress := genKeyPair.Address().Text()
 						migToGenNameSuggest := "Dest. Account " + fmt.Sprint(len(creds.Wallets)+1)
 
 						fromLabel := widget.NewLabelWithStyle("Departure Account", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
@@ -551,9 +551,9 @@ func manageAccountsDia(creds core.Credentials) {
 
 							expire := time.Now().UTC().Add(time.Second * 300).Unix()
 							sb := scriptbuilder.BeginScript()
-							sb.AllowGas(keyPair.Address().String(), cryptography.NullAddress().String(), core.UserSettings.GasPrice, migAccFeeLimit)
-							sb.CallContract("account", "migrate", keyPair.Address().String(), genAddress)
-							sb.SpendGas(keyPair.Address().String())
+							sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().Text(), core.UserSettings.GasPrice, migAccFeeLimit)
+							sb.CallContract("account", "migrate", keyPair.Address().Text(), genAddress)
+							sb.SpendGas(keyPair.Address().Text())
 							script := sb.EndScript()
 
 							tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Account Migration"))
@@ -704,7 +704,7 @@ func manageAccountsDia(creds core.Credentials) {
 								}
 							}
 
-							migToKeyAddress := migToKeyPair.Address().String()
+							migToKeyAddress := migToKeyPair.Address().Text()
 
 							response, err := core.Client.GetAccount(migToKeyAddress)
 							if err != nil {
@@ -749,9 +749,9 @@ func manageAccountsDia(creds core.Credentials) {
 
 								expire := time.Now().UTC().Add(time.Second * 300).Unix()
 								sb := scriptbuilder.BeginScript()
-								sb.AllowGas(keyPair.Address().String(), cryptography.NullAddress().String(), core.UserSettings.GasPrice, migAccFeeLimit)
-								sb.CallContract("account", "migrate", keyPair.Address().String(), migToKeyAddress)
-								sb.SpendGas(keyPair.Address().String())
+								sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().Text(), core.UserSettings.GasPrice, migAccFeeLimit)
+								sb.CallContract("account", "migrate", keyPair.Address().Text(), migToKeyAddress)
+								sb.SpendGas(keyPair.Address().Text())
 								script := sb.EndScript()
 
 								tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Account Migration"))
@@ -1028,8 +1028,8 @@ func manageAccountsDia(creds core.Credentials) {
 					pk, _ := core.MnemonicToPk(s, 0)
 					keyPair := cryptography.NewPhantasmaKeys(pk)
 					wif = keyPair.WIF()
-					address = keyPair.Address().String()
-					msg, err := core.ValidateAccountInput(nil, creds.Wallets, "", "account", true, walletNameEntry.Text, keyPair.WIF(), keyPair.Address().String(), true)
+					address = keyPair.Address().Text()
+					msg, err := core.ValidateAccountInput(nil, creds.Wallets, "", "account", true, walletNameEntry.Text, keyPair.WIF(), keyPair.Address().Text(), true)
 					if err != nil {
 
 						warning.Set(msg)
@@ -1052,8 +1052,8 @@ func manageAccountsDia(creds core.Credentials) {
 
 				keyPair, _ := cryptography.FromWIF(s)
 				wif = keyPair.WIF()
-				address = keyPair.Address().String()
-				msg, err = core.ValidateAccountInput(nil, creds.Wallets, "", "account", true, walletNameEntry.Text, s, keyPair.Address().String(), true)
+				address = keyPair.Address().Text()
+				msg, err = core.ValidateAccountInput(nil, creds.Wallets, "", "account", true, walletNameEntry.Text, s, keyPair.Address().Text(), true)
 				if err != nil {
 					warning.Set(msg)
 					return err
@@ -1134,7 +1134,7 @@ func manageAccountsDia(creds core.Credentials) {
 		keyPair := cryptography.NewPhantasmaKeys(pk)
 
 		privateKey := keyPair.WIF()
-		address := keyPair.Address().String()
+		address := keyPair.Address().Text()
 		walletNameSuggest := "Sparky Account " + fmt.Sprint(len(creds.Wallets)+1)
 		nameEntryBind := binding.BindString(&walletNameSuggest)
 		nameEntry := widget.NewEntryWithData(nameEntryBind)

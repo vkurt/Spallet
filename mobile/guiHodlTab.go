@@ -53,12 +53,12 @@ func hodlGui(creds core.Credentials) {
 				})
 				return
 			}
-			from := keyPair.Address().String()
+			from := keyPair.Address().Text()
 			expire := time.Now().UTC().Add(time.Second * 300).Unix()
 			sb := scriptbuilder.BeginScript()
-			sb.AllowGas(from, cryptography.NullAddress().String(), core.UserSettings.GasPrice, stakeFeeLimit)
+			sb.AllowGas(from, cryptography.NullAddress().Text(), core.UserSettings.GasPrice, stakeFeeLimit)
 			sb.CallContract("stake", "Claim", from, from)
-			sb.SpendGas(keyPair.Address().String())
+			sb.SpendGas(keyPair.Address().Text())
 			script := sb.EndScript()
 			tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Spark Collecting"))
 			tx.Sign(keyPair)
@@ -143,12 +143,12 @@ func hodlGui(creds core.Credentials) {
 				return
 			}
 
-			from := keyPair.Address().String()
+			from := keyPair.Address().Text()
 			expire := time.Now().UTC().Add(time.Second * 300).Unix()
 			sb := scriptbuilder.BeginScript()
-			sb.AllowGas(from, cryptography.NullAddress().String(), core.UserSettings.GasPrice, stakeFeeLimit)
+			sb.AllowGas(from, cryptography.NullAddress().Text(), core.UserSettings.GasPrice, stakeFeeLimit)
 			sb.CallContract("stake", "Stake", from, amount.String())
-			sb.SpendGas(keyPair.Address().String())
+			sb.SpendGas(keyPair.Address().Text())
 			script := sb.EndScript()
 			tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Soul Power Up"))
 			tx.Sign(keyPair)
@@ -210,12 +210,12 @@ func hodlGui(creds core.Credentials) {
 				return
 			}
 
-			from := keyPair.Address().String()
+			from := keyPair.Address().Text()
 			expire := time.Now().UTC().Add(time.Second * 300).Unix()
 			sb := scriptbuilder.BeginScript()
-			sb.AllowGas(from, cryptography.NullAddress().String(), core.UserSettings.GasPrice, stakeFeeLimit)
+			sb.AllowGas(from, cryptography.NullAddress().Text(), core.UserSettings.GasPrice, stakeFeeLimit)
 			sb.CallContract("stake", "Unstake", from, amount.String())
-			sb.SpendGas(keyPair.Address().String())
+			sb.SpendGas(keyPair.Address().Text())
 			script := sb.EndScript()
 			tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Soul Drain"))
 			tx.Sign(keyPair)
@@ -362,12 +362,12 @@ func hodlGui(creds core.Credentials) {
 					return
 				}
 
-				from := keyPair.Address().String()
+				from := keyPair.Address().Text()
 				expire := time.Now().UTC().Add(time.Second * 300).Unix()
 				sb := scriptbuilder.BeginScript()
-				sb.AllowGas(from, cryptography.NullAddress().String(), core.UserSettings.GasPrice, stakeFeeLimit)
+				sb.AllowGas(from, cryptography.NullAddress().Text(), core.UserSettings.GasPrice, stakeFeeLimit)
 				sb.CallContract("account", "RegisterName", from, registerNameEntry.Text)
-				sb.SpendGas(keyPair.Address().String())
+				sb.SpendGas(keyPair.Address().Text())
 				script := sb.EndScript()
 				tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Name Forging"))
 				tx.Sign(keyPair)
@@ -407,13 +407,13 @@ func hodlGui(creds core.Credentials) {
 					return
 				}
 
-				from := keyPair.Address().String()
+				from := keyPair.Address().Text()
 				expire := time.Now().UTC().Add(time.Second * 300).Unix()
 				sb := scriptbuilder.BeginScript()
-				sb.AllowGas(from, cryptography.NullAddress().String(), core.UserSettings.GasPrice, stakeFeeLimit)
+				sb.AllowGas(from, cryptography.NullAddress().Text(), core.UserSettings.GasPrice, stakeFeeLimit)
 				sb.CallContract("account", "UnregisterName", from)
 				sb.CallContract("account", "RegisterName", from, registerNameEntry.Text)
-				sb.SpendGas(keyPair.Address().String())
+				sb.SpendGas(keyPair.Address().Text())
 				script := sb.EndScript()
 				tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Name Reforging"))
 				tx.Sign(keyPair)
@@ -475,12 +475,12 @@ func hodlGui(creds core.Credentials) {
 				})
 				return
 			}
-			from := keyPair.Address().String()
+			from := keyPair.Address().Text()
 			expire := time.Now().UTC().Add(time.Second * 300).Unix()
 			sb := scriptbuilder.BeginScript()
-			sb.AllowGas(from, cryptography.NullAddress().String(), core.UserSettings.GasPrice, stakeFeeLimit)
+			sb.AllowGas(from, cryptography.NullAddress().Text(), core.UserSettings.GasPrice, stakeFeeLimit)
 			sb.CallContract("stake", "MasterClaim", from)
-			sb.SpendGas(keyPair.Address().String())
+			sb.SpendGas(keyPair.Address().Text())
 			script := sb.EndScript()
 			tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Master's Bounty Distribution"))
 			tx.Sign(keyPair)
@@ -565,12 +565,12 @@ func hodlGui(creds core.Credentials) {
 				return
 			}
 
-			from := keyPair.Address().String()
+			from := keyPair.Address().Text()
 			expire := time.Now().UTC().Add(time.Second * 300).Unix()
 			sb := scriptbuilder.BeginScript()
-			sb.AllowGas(from, cryptography.NullAddress().String(), core.UserSettings.GasPrice, crownForgeFeeLimit)
+			sb.AllowGas(from, cryptography.NullAddress().Text(), core.UserSettings.GasPrice, crownForgeFeeLimit)
 			sb.CallContract("gas", "ApplyInflation", from)
-			sb.SpendGas(keyPair.Address().String())
+			sb.SpendGas(keyPair.Address().Text())
 			script := sb.EndScript()
 			tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Crown Forging"))
 			tx.Sign(keyPair)

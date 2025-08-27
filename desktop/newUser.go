@@ -15,8 +15,8 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/cosmos/go-bip39"
 	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
-	"github.com/tyler-smith/go-bip39"
 )
 
 // Function to show Welcome Page
@@ -440,7 +440,7 @@ func generateNewWalletPage(creds core.Credentials) {
 
 	keyPair := cryptography.NewPhantasmaKeys(pk)
 	privateKey := keyPair.WIF()
-	address := keyPair.Address().String()
+	address := keyPair.Address().Text()
 	nameEntry := widget.NewEntry()
 	nameEntry.SetText("Sparky Account 1")
 	nameEntry.TypedShortcut(&fyne.ShortcutSelectAll{})
@@ -556,7 +556,7 @@ func showImportAccountPage(creds core.Credentials) {
 			}
 		}
 
-		address := keyPair.Address().String()
+		address := keyPair.Address().Text()
 		walletName := walletNameEntry.Text
 
 		if creds.Wallets == nil {

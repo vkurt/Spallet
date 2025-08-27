@@ -702,7 +702,7 @@ func ExecuteSwap(route []TransactionDataForDex, slippageTolerance float64, creds
 
 	swapPayload := []byte(payload)
 	sb := scriptbuilder.BeginScript()
-	sb.AllowGas(wallet.Address, cryptography.NullAddress().String(), UserSettings.GasPrice, dexGasLimit)
+	sb.AllowGas(wallet.Address, cryptography.NullAddress().Text(), UserSettings.GasPrice, dexGasLimit)
 
 	for _, tx := range route {
 		// Debug print script parameters

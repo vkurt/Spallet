@@ -56,8 +56,13 @@ func GetChainStatistics() error {
 		if err != nil {
 			return fmt.Errorf("getting total staked soul: %v", err)
 		}
-		totalStakedSoulBig := StringToBigInt(account.Balances[0].Amount)
-		LatestChainStatisticsData.TotalStakedSoul = &totalStakedSoulBig
+		if len(account.Balances) > 0 {
+			totalStakedSoulBig := StringToBigInt(account.Balances[0].Amount)
+			LatestChainStatisticsData.TotalStakedSoul = &totalStakedSoulBig
+		} else {
+			LatestChainStatisticsData.TotalStakedSoul = big.NewInt(1)
+		}
+
 		fmt.Println("totalStakedSoul:", LatestChainStatisticsData.TotalStakedSoul)
 		// ***
 
@@ -73,12 +78,19 @@ func GetChainStatistics() error {
 		if err != nil {
 			return fmt.Errorf("error fetching chain statistics: %v", err)
 		}
+		if len(response.Results) > 0 {
+			LatestChainStatisticsData.LastInflationTimeStamp = response.DecodeResults(0).AsNumber().Int64()
 
-		LatestChainStatisticsData.LastInflationTimeStamp = response.DecodeResults(0).AsNumber().Int64()
+			LatestChainStatisticsData.TotalMaster = int16(response.DecodeResults(1).AsNumber().Int64())
 
-		LatestChainStatisticsData.TotalMaster = int16(response.DecodeResults(1).AsNumber().Int64())
+			LatestChainStatisticsData.EligibleMaster = int16(response.DecodeResults(2).AsNumber().Int64())
+		} else {
+			LatestChainStatisticsData.LastInflationTimeStamp = 1
 
-		LatestChainStatisticsData.EligibleMaster = int16(response.DecodeResults(2).AsNumber().Int64())
+			LatestChainStatisticsData.TotalMaster = 1
+
+			LatestChainStatisticsData.EligibleMaster = 1
+		}
 
 		LatestChainStatisticsData.EstSMReward = float64(soulMasterRewardPool) / float64(LatestChainStatisticsData.EligibleMaster)
 
@@ -87,7 +99,7 @@ func GetChainStatistics() error {
 		if LatestChainStatisticsData.NextInfTimeStamp > int64(currentTime) {
 			LatestChainStatisticsData.RemainedTimeForCrown = LatestChainStatisticsData.NextInfTimeStamp - int64(currentTime)
 		} else {
-			LatestChainStatisticsData.RemainedTimeForCrown = 0
+			LatestChainStatisticsData.RemainedTimeForCrown = 1
 		}
 
 		// Adjust for 8 decimals: divide by 10^8

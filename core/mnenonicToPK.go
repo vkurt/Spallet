@@ -3,9 +3,9 @@ package core
 import (
 	"strings"
 
+	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcutil/hdkeychain"
-	"github.com/tyler-smith/go-bip39"
+	"github.com/cosmos/go-bip39"
 )
 
 const DefaultMnemonicEntropy = 128 //256 for 24 word seed phrase
@@ -29,14 +29,14 @@ func MnemonicToPk(mnemonic string, pkIndex uint32) ([]byte, error) {
 	// Traverse the key path
 	pk := masterKey
 	for _, index := range keyPath {
-		pk, err = pk.Child(index)
+		pk, err = pk.Derive(index)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	// Derive the key for the specified index
-	keyNew, err := pk.Child(pkIndex)
+	keyNew, err := pk.Derive(pkIndex)
 	if err != nil {
 		return nil, err
 	}

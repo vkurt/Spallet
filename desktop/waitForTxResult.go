@@ -116,6 +116,7 @@ func sendTransaction(txHex string, creds core.Credentials) {
 	txCount := core.LatestAccountData.TransactionCount
 	go func() {
 		txHash, err := core.Client.SendRawTransaction(txHex)
+		println(txHex)
 		if err != nil || util.ErrorDetect(txHash) {
 			dialog.ShowError(fmt.Errorf("an error happened during sending transaction,\n%v", err), mainWindowGui)
 			if currentMainDialog != nil {

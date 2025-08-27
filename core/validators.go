@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/tyler-smith/go-bip39"
+	"github.com/cosmos/go-bip39"
 )
 
 // validateAccountInput validates a wallet name, account details, or just an account address based on the specified check type.

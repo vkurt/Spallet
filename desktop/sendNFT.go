@@ -58,17 +58,16 @@ func buildNftTransaction(WIF string, nftsToSend map[string][]string, to string, 
 		})
 		return
 	}
-	from := keyPair.Address().String()
 
 	expire := time.Now().UTC().Add(time.Second * 300).Unix()
 	fmt.Println("expiration time: ", expire)
 	sb := scriptbuilder.BeginScript()
-	sb.AllowGas(from, cryptography.NullAddress().String(), core.UserSettings.GasPrice, nftFeeLimit)
+	sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().Text(), core.UserSettings.GasPrice, nftFeeLimit)
 	for id, symbol := range nftsToSend {
 		fmt.Printf("Sending nft : %v %v\n", symbol[0], id)
-		sb.CallInterop("Runtime.TransferToken", from, to, symbol[0], id)
+		sb.CallInterop("Runtime.TransferToken", keyPair.Address().Text(), to, symbol[0], id)
 	}
-	sb.SpendGas(keyPair.Address().String())
+	sb.SpendGas(keyPair.Address().Text())
 	script := sb.EndScript()
 	tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Transfer"))
 	tx.Sign(keyPair)

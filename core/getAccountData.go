@@ -380,11 +380,19 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 		// }
 
 		if check == 1 {
+			if len(response1.Results) > 0 {
+				LatestAccountData.LastStakeTimestamp = response1.DecodeResults(0).AsNumber().Int64()
+				passedTimeAfterKcalGen := response1.DecodeResults(1).AsNumber().Int64()
+				LatestAccountData.SoulmasterSince = response1.DecodeResults(2).AsNumber().Int64()
+				LatestAccountData.OnChainName = response1.DecodeResults(3).AsString()
+				LatestAccountData.RemainedTimeForKcalGen = 86400 - passedTimeAfterKcalGen
+			} else {
+				LatestAccountData.LastStakeTimestamp = 1
 
-			LatestAccountData.LastStakeTimestamp = response1.DecodeResults(0).AsNumber().Int64()
-			passedTimeAfterKcalGen := response1.DecodeResults(1).AsNumber().Int64()
-			LatestAccountData.SoulmasterSince = response1.DecodeResults(2).AsNumber().Int64()
-			LatestAccountData.OnChainName = response1.DecodeResults(3).AsString()
+				LatestAccountData.SoulmasterSince = 1
+				LatestAccountData.OnChainName = "anonymous"
+				LatestAccountData.RemainedTimeForKcalGen = 86400
+			}
 
 			// fmt.Printf("passedTimeAfterKcalGen %v \n", passedTimeAfterKcalGen)
 
@@ -405,8 +413,6 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 			}
 
 			// fmt.Printf("accRemainedTimeForUnstake %v \n", accRemainedTimeForUnstake)
-
-			LatestAccountData.RemainedTimeForKcalGen = 86400 - passedTimeAfterKcalGen
 
 			// fmt.Printf("accIsSoulMaster %v \n", accIsSoulMaster)
 			// fmt.Printf("lastInflationTimeStamp %v \n", LatestChainStatisticsData.LastInflationTimeStamp)
@@ -431,10 +437,17 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 			LatestAccountData.KcalDailyProd = CalculateKcalDailyProd(LatestAccountData.KcalBoost, LatestAccountData.StakedBalances.Amount, KcalProdRate)
 
 		} else if check == 2 {
+			if len(response1.Results) > 0 {
+				LatestAccountData.LastStakeTimestamp = response1.DecodeResults(0).AsNumber().Int64()
+				passedTimeAfterKcalGen := response1.DecodeResults(1).AsNumber().Int64()
+				LatestAccountData.OnChainName = response1.DecodeResults(2).AsString()
+				LatestAccountData.RemainedTimeForKcalGen = 86400 - passedTimeAfterKcalGen
+			} else {
+				LatestAccountData.LastStakeTimestamp = 1
 
-			LatestAccountData.LastStakeTimestamp = response1.DecodeResults(0).AsNumber().Int64()
-			passedTimeAfterKcalGen := response1.DecodeResults(1).AsNumber().Int64()
-			LatestAccountData.OnChainName = response1.DecodeResults(2).AsString()
+				LatestAccountData.OnChainName = "anonymous"
+				LatestAccountData.RemainedTimeForKcalGen = 86400
+			}
 
 			LatestAccountData.KcalDailyProd = CalculateKcalDailyProd(LatestAccountData.KcalBoost, LatestAccountData.StakedBalances.Amount, KcalProdRate)
 
@@ -445,8 +458,6 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 			} else {
 				LatestAccountData.RemainedTimeForUnstake = LatestAccountData.RemainedTimeForUnstake - currentUtcTime.Unix()
 			}
-
-			LatestAccountData.RemainedTimeForKcalGen = 86400 - passedTimeAfterKcalGen
 
 			fmt.Printf(" account Details :\n lastStakeTimeStamp %v\n TimeBeforeUnstake %v\n LookUpAddress %v\n", LatestAccountData.LastStakeTimestamp, LatestAccountData.RemainedTimeForUnstake, LatestAccountData.OnChainName)
 
