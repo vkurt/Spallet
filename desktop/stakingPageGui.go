@@ -25,6 +25,9 @@ func showStakingPage(creds core.Credentials) {
 	var countdownForCrwn string
 	var onChainNameText string
 	stakeFeeLimit := core.UserSettings.DefaultGasLimit
+	if core.LatestAccountData.StakedBalances.Unclaimed == nil {
+		core.LatestAccountData.StakedBalances.Unclaimed = big.NewInt(0)
+	}
 
 	if core.LatestAccountData.OnChainName == "anonymous" {
 		onChainNameText = "Not forged by Specky"
@@ -61,9 +64,9 @@ func showStakingPage(creds core.Credentials) {
 
 				expire := time.Now().UTC().Add(time.Second * 300).Unix()
 				sb := scriptbuilder.BeginScript()
-				sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().Text(), core.UserSettings.GasPrice, stakeFeeLimit)
+				sb.AllowGas(keyPair.Address(), cryptography.NullAddress(), core.UserSettings.GasPrice, stakeFeeLimit)
 				sb.CallContract("stake", "Claim", keyPair.Address().Text(), keyPair.Address().Text())
-				sb.SpendGas(keyPair.Address().Text())
+				sb.SpendGas(keyPair.Address())
 				script := sb.EndScript()
 				tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Spark Collecting"))
 				tx.Sign(keyPair)
@@ -166,9 +169,9 @@ func showStakingPage(creds core.Credentials) {
 
 				expire := time.Now().UTC().Add(time.Second * 300).Unix()
 				sb := scriptbuilder.BeginScript()
-				sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().Text(), core.UserSettings.GasPrice, stakeFeeLimit)
+				sb.AllowGas(keyPair.Address(), cryptography.NullAddress(), core.UserSettings.GasPrice, stakeFeeLimit)
 				sb.CallContract("stake", "Stake", keyPair.Address().Text(), amount.String())
-				sb.SpendGas(keyPair.Address().Text())
+				sb.SpendGas(keyPair.Address())
 				script := sb.EndScript()
 				tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Soul Power Up"))
 				tx.Sign(keyPair)
@@ -243,9 +246,9 @@ func showStakingPage(creds core.Credentials) {
 
 				expire := time.Now().UTC().Add(time.Second * 300).Unix()
 				sb := scriptbuilder.BeginScript()
-				sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().Text(), core.UserSettings.GasPrice, stakeFeeLimit)
+				sb.AllowGas(keyPair.Address(), cryptography.NullAddress(), core.UserSettings.GasPrice, stakeFeeLimit)
 				sb.CallContract("stake", "Unstake", keyPair.Address().Text(), amount.String())
-				sb.SpendGas(keyPair.Address().Text())
+				sb.SpendGas(keyPair.Address())
 				script := sb.EndScript()
 				tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Soul Drain"))
 				tx.Sign(keyPair)
@@ -313,6 +316,12 @@ func showStakingPage(creds core.Credentials) {
 
 	stakeMaxSoul.Disable()
 	collectMaxSoul.Disable()
+	if accFreeSoulAmount == nil {
+		accFreeSoulAmount = big.NewInt(0)
+	}
+	if core.LatestAccountData.StakedBalances.Amount == nil {
+		core.LatestAccountData.StakedBalances.Amount = big.NewInt(0)
+	}
 
 	if accFreeSoulAmount.Cmp(big.NewInt(0)) > 0 && core.LatestAccountData.StakedBalances.Amount.Cmp(big.NewInt(0)) > 0 && core.LatestAccountData.RemainedTimeForUnstake == 0 {
 		stakeMaxSoul.Enable()
@@ -408,9 +417,9 @@ func showStakingPage(creds core.Credentials) {
 
 					expire := time.Now().UTC().Add(time.Second * 300).Unix()
 					sb := scriptbuilder.BeginScript()
-					sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().Text(), core.UserSettings.GasPrice, stakeFeeLimit)
+					sb.AllowGas(keyPair.Address(), cryptography.NullAddress(), core.UserSettings.GasPrice, stakeFeeLimit)
 					sb.CallContract("account", "RegisterName", keyPair.Address().Text(), registerNameEntry.Text)
-					sb.SpendGas(keyPair.Address().Text())
+					sb.SpendGas(keyPair.Address())
 					script := sb.EndScript()
 					tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Name Forging"))
 					tx.Sign(keyPair)
@@ -458,10 +467,10 @@ func showStakingPage(creds core.Credentials) {
 
 					expire := time.Now().UTC().Add(time.Second * 300).Unix()
 					sb := scriptbuilder.BeginScript()
-					sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().Text(), core.UserSettings.GasPrice, stakeFeeLimit)
+					sb.AllowGas(keyPair.Address(), cryptography.NullAddress(), core.UserSettings.GasPrice, stakeFeeLimit)
 					sb.CallContract("account", "UnregisterName", keyPair.Address().Text())
 					sb.CallContract("account", "RegisterName", keyPair.Address().Text(), registerNameEntry.Text)
-					sb.SpendGas(keyPair.Address().Text())
+					sb.SpendGas(keyPair.Address())
 					script := sb.EndScript()
 					tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Name Reforging"))
 					tx.Sign(keyPair)
@@ -533,9 +542,9 @@ func showStakingPage(creds core.Credentials) {
 
 			expire := time.Now().UTC().Add(time.Second * 300).Unix()
 			sb := scriptbuilder.BeginScript()
-			sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().Text(), core.UserSettings.GasPrice, stakeFeeLimit)
+			sb.AllowGas(keyPair.Address(), cryptography.NullAddress(), core.UserSettings.GasPrice, stakeFeeLimit)
 			sb.CallContract("stake", "MasterClaim", keyPair.Address().Text())
-			sb.SpendGas(keyPair.Address().Text())
+			sb.SpendGas(keyPair.Address())
 			script := sb.EndScript()
 			tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Master's Bounty Distribution"))
 			tx.Sign(keyPair)
@@ -627,9 +636,9 @@ func showStakingPage(creds core.Credentials) {
 
 			expire := time.Now().UTC().Add(time.Second * 300).Unix()
 			sb := scriptbuilder.BeginScript()
-			sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().Text(), core.UserSettings.GasPrice, crownForgeFeeLimit)
+			sb.AllowGas(keyPair.Address(), cryptography.NullAddress(), core.UserSettings.GasPrice, crownForgeFeeLimit)
 			sb.CallContract("gas", "ApplyInflation", keyPair.Address().Text())
-			sb.SpendGas(keyPair.Address().Text())
+			sb.SpendGas(keyPair.Address())
 			script := sb.EndScript()
 			tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Crown Forging"))
 			tx.Sign(keyPair)

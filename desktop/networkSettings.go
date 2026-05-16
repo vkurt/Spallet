@@ -146,9 +146,9 @@ func showNetworkSettingsPage(creds core.Credentials) {
 			customChainNetwork.Reload()
 			core.Client = rpc.NewRPCTestnet()
 			settingsForSave.RpcType = "testnet"
-			settingsForSave.TxExplorerLink = "https://test-explorer.phantasma.info/en/transaction?id="
+			settingsForSave.TxExplorerLink = "https://testnet-explorer.phantasma.info/tx/"
 			customChainTxExplorerLink.Reload()
-			settingsForSave.AccExplorerLink = "https://test-explorer.phantasma.info/en/address?id="
+			settingsForSave.AccExplorerLink = "https://testnet-explorer.phantasma.info/address/"
 			customChainAccExplorerLink.Reload()
 			settingsForSave.NetworkType = "Testnet"
 			customChainNameEntry.Disable()

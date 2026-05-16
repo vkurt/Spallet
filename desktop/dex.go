@@ -723,7 +723,9 @@ func monitorSwapTransaction(txHash string, creds core.Credentials, txCount int) 
 
 			showTxResultDialog("Transaction monitoring timed out.", creds, response.TransactionResult{Hash: txHash, Fee: "0"}, txCount)
 			createDexContent(creds)
-			dexTab.Refresh()
+			if dexTab != nil {
+				dexTab.Refresh()
+			}
 
 			return
 		}
@@ -742,7 +744,9 @@ func monitorSwapTransaction(txHash string, creds core.Credentials, txCount int) 
 			showTxResultDialog("Failed to get transaction status.", creds, response.TransactionResult{Hash: txHash, Fee: "0"}, txCount)
 
 			createDexContent(creds)
-			dexTab.Refresh()
+			if dexTab != nil {
+				dexTab.Refresh()
+			}
 
 			return
 		}
@@ -753,7 +757,9 @@ func monitorSwapTransaction(txHash string, creds core.Credentials, txCount int) 
 			showTxResultDialog("Swap completed successfully.", creds, txResult, txCount)
 
 			createDexContent(creds)
-			dexTab.Refresh()
+			if dexTab != nil {
+				dexTab.Refresh()
+			}
 
 			return
 		}
@@ -762,7 +768,9 @@ func monitorSwapTransaction(txHash string, creds core.Credentials, txCount int) 
 			showTxResultDialog("Swap failed.", creds, txResult, txCount)
 
 			createDexContent(creds)
-			dexTab.Refresh()
+			if dexTab != nil {
+				dexTab.Refresh()
+			}
 
 			return
 		}

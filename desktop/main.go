@@ -142,7 +142,7 @@ func updateWalletInfo(creds core.Credentials, walletInfo *fyne.Container) {
 				}
 			}
 		}(creds.Wallets[creds.LastSelectedWallet].Address)), widget.NewButtonWithIcon(creds.Wallets[creds.LastSelectedWallet].Address, theme.ContentCopyIcon(), func() {
-			fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(creds.Wallets[creds.LastSelectedWallet].Address)
+			fyne.App.Clipboard(spallet).SetContent(creds.Wallets[creds.LastSelectedWallet].Address)
 			dialog.ShowInformation("Copied", "Wallet Address copied to clipboard", fyne.CurrentApp().Driver().AllWindows()[0])
 		})),
 	}
@@ -217,23 +217,26 @@ func showExistingUserLogin() {
 			core.LoadSettings("data/essential/settings.spallet", rootPath) // Load settings at startup
 			core.LoadTokenCache(rootPath)
 
-			err = core.GetChainStatistics()
+			/*err = core.GetChainStatistics()
 			if err != nil {
 				closeUpdatingDialog()
 				dialog.ShowError(fmt.Errorf("an error happened during fetching data,\n %v", err), mainWindowGui)
 				return
 			} else {
-				core.DataFetch(creds, rootPath)
 
-				autoUpdate(updateInterval, creds, rootPath)
-				core.LatestTokenData.ChainTokenUpdateTime = time.Now().UTC().Unix() - 3590 // we will update data automaticaly 15 sec after login with auto update
-				core.LatestTokenData.AllTokenUpdateTime = time.Now().UTC().Unix()
-				core.LatestTokenData.AccTokenUpdateTime = time.Now().UTC().Unix()
-				mainWindow(creds)
-				loggedIn = true
-				closeUpdatingDialog()
 
 			}
+			*/
+			core.DataFetch(creds, rootPath)
+
+			autoUpdate(updateInterval, creds, rootPath)
+			core.LatestTokenData.ChainTokenUpdateTime = time.Now().UTC().Unix() - 3590 // we will update data automaticaly 15 sec after login with auto update
+			core.LatestTokenData.AllTokenUpdateTime = time.Now().UTC().Unix()
+			core.LatestTokenData.AccTokenUpdateTime = time.Now().UTC().Unix()
+			mainWindow(creds)
+			loggedIn = true
+			closeUpdatingDialog()
+
 			// this will update  tokens data from cache if user dont dave cache yet it will create one with main tokens
 
 			// var foundWalletNumber = 0
@@ -356,12 +359,15 @@ func mainWindow(creds core.Credentials) {
 	networkButton := widget.NewButton("Network", func() {
 		showNetworkSettingsPage(creds)
 	})
-	chainStatsButton := widget.NewButton("Chain Statistics", func() {
-		showUpdatingDialog()
-		core.GetChainStatistics() // Assume this updates the walletDetails with chain stats
-		buildAndShowChainStatistics()
+	/*
+		chainStatsButton := widget.NewButton("Chain Statistics", func() {
+			showUpdatingDialog()
+			core.GetChainStatistics() // Assume this updates the walletDetails with chain stats
+			buildAndShowChainStatistics()
 
-	})
+		})
+	*/
+
 	refreshButton := widget.NewButton("Refresh", func() {
 		showUpdatingDialog()
 		err := core.DataFetch(creds, rootPath)
@@ -384,7 +390,7 @@ func mainWindow(creds core.Credentials) {
 	backupBttn := widget.NewButton("Rescue Point", func() { showBackupDia(creds) })
 	menu := container.NewBorder(
 		container.NewVBox(walletSelect, accBadges),
-		container.NewVBox(refreshButton, backupBttn, AddrBkBttn, securityBttn, chainStatsButton, manageAccountsButton, networkButton),
+		container.NewVBox(refreshButton, backupBttn, AddrBkBttn, securityBttn, manageAccountsButton, networkButton),
 		nil, nil, nil,
 	)
 
@@ -404,7 +410,10 @@ func mainWindow(creds core.Credentials) {
 			core.SaveCredentials(creds, rootPath)
 			autoUpdate(updateInterval, creds, rootPath)
 			dexTab = createDexContent(creds) // dex page also need an update but dunno this is a godd solution
-			dexTab.Refresh()
+
+			if dexTab != nil {
+				dexTab.Refresh()
+			}
 
 			closeUpdatingDialog()
 		}

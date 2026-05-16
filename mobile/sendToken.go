@@ -53,6 +53,7 @@ func buildTokenTransaction(WIF, tokenSymbol, to string, tokenAmount *big.Int, cr
 		})
 		return
 	}
+	toAddress, _ := cryptography.FromString(to)
 
 	expire := time.Now().UTC().Add(time.Second * 300).Unix()
 	// fmt.Println("Sending token from ", keyPair.Address().Text())
@@ -64,9 +65,9 @@ func buildTokenTransaction(WIF, tokenSymbol, to string, tokenAmount *big.Int, cr
 	// fmt.Println("Expiration time ", time.Unix(expire, 0).Format("2006-01-02 15:04:05"))
 
 	sb := scriptbuilder.BeginScript()
-	sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().Text(), core.UserSettings.GasPrice, tokenFeeLimit)
-	sb.TransferTokens(tokenSymbol, keyPair.Address().Text(), to, tokenAmount)
-	sb.SpendGas(keyPair.Address().Text())
+	sb.AllowGas(keyPair.Address(), cryptography.NullAddress(), core.UserSettings.GasPrice, tokenFeeLimit)
+	sb.TransferTokens(tokenSymbol, keyPair.Address(), toAddress, tokenAmount)
+	sb.SpendGas(keyPair.Address())
 	script := sb.EndScript()
 
 	tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Transfer"))

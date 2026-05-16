@@ -148,28 +148,30 @@ func buildAndShowAccInfo(creds core.Credentials) {
 		widget.NewLabelWithStyle(accSoulMasterInfoHeader, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		widget.NewLabel(accSoulMasterInfo),
 	)
-	var x, y float32
+	scrollpos := accInfoTab.Offset
 	if core.LatestAccountData.IsBalanceUpdated {
 		buildBadges()
 		buildBalanceButtons(creds)
-		x, y = tokenBtns.Offset.Components()
+		scrollpos = tokenBtns.Offset
 		tokenBtns.SetMinSize(fyne.NewSize(0, 525))
 		tokenBtns.Refresh()
-		tokenBtns.Offset = fyne.NewPos(x, y)
+		tokenBtns.Offset = scrollpos
 
-		x, y = nftBtns.Offset.Components()
+		scrollpos = nftBtns.Offset
 		nftBtns.SetMinSize(fyne.NewSize(0, 525))
 		nftBtns.Refresh()
-		nftBtns.Offset = fyne.NewPos(x, y)
+		nftBtns.Offset = scrollpos
 		core.LatestAccountData.IsBalanceUpdated = false
 	}
 
 	showStakingPage(creds)
 
-	x, y = accInfoTab.Offset.Components()
 	accInfoTab.Content = accInfo
-	accInfoTab.SetMinSize(fyne.NewSize(0, 525))
-	accInfoTab.Refresh()
-	accInfoTab.Offset = fyne.NewPos(x, y)
+	// accInfoTab.SetMinSize(fyne.NewSize(0, 525))
+	if accInfoTab != nil {
+		accInfoTab.Refresh()
+	}
+
+	accInfoTab.Offset = scrollpos
 
 }

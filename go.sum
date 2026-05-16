@@ -109,6 +109,8 @@ github.com/onsi/gomega v1.7.1/go.mod h1:XdKZgCCFLUoM/7CFJVPcG8C1xQ1AJ0vpAezJrB7J
 github.com/onsi/gomega v1.10.1/go.mod h1:iN09h71vgCQne3DLsj+A5owkum+a2tYe+TOCB1ybHNo=
 github.com/phantasma-io/phantasma-go v0.0.0-20250416032013-5cd71c2a2228 h1:VFwYeWPzGezKFgdWyHXEbtPdP+fDNr+KFaejrL2P61o=
 github.com/phantasma-io/phantasma-go v0.0.0-20250416032013-5cd71c2a2228/go.mod h1:x67OoS2N07WHmR6vnutY5ZeiTdrqOLBBtjgiFjTsQMA=
+github.com/phantasma-io/phantasma-go v0.7.0 h1:d2eDdtHeRAQgc9sb178+gIif9OIbHEUZGeaM3bZR4gI=
+github.com/phantasma-io/phantasma-go v0.7.0/go.mod h1:aUvG2cHB4qPjoH0LBnjj3haPAJEb1vcgottrUxj0D4w=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/rymdport/portal v0.4.1 h1:2dnZhjf5uEaeDjeF/yBIeeRo6pNI2QAKm7kq1w/kbnA=

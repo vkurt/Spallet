@@ -366,20 +366,23 @@ func showWalletSetupPage(creds core.Credentials) {
 
 							restoreDia.Hide()
 							showUpdatingDialog()
-							err := core.GetChainStatistics()
-							if err == nil {
-								core.UpdateOrCheckTokenCache("", 3, "chain", rootPath)
-								core.DataFetch(creds, rootPath)
-								mainWindow(creds)
-								closeUpdatingDialog()
-								dialog.ShowInformation("Found new data", restoreInfo, mainWindowGui)
+							/*
+								err := core.GetChainStatistics()
+								if err == nil {
 
-								autoUpdate(updateInterval, creds, rootPath)
 
-							} else {
-								dialog.ShowError(err, mainWindowGui)
-								return
-							}
+								} else {
+									dialog.ShowError(err, mainWindowGui)
+									return
+								}
+							*/
+							core.UpdateOrCheckTokenCache("", 3, "chain", rootPath)
+							core.DataFetch(creds, rootPath)
+							mainWindow(creds)
+							closeUpdatingDialog()
+							dialog.ShowInformation("Found new data", restoreInfo, mainWindowGui)
+
+							autoUpdate(updateInterval, creds, rootPath)
 
 						} else {
 
@@ -677,18 +680,21 @@ func startWallet(creds core.Credentials) error {
 	}
 
 	showUpdatingDialog()
-	err := core.GetChainStatistics()
-	if err != nil {
-		dialog.ShowError(err, mainWindowGui)
-		return err
-	} else {
-		core.UpdateOrCheckTokenCache("", 3, "chain", rootPath)
-		core.DataFetch(creds, rootPath)
-		mainWindow(creds)
-		loggedIn = true
-		closeUpdatingDialog()
+	/*
+		err := core.GetChainStatistics()
+		if err != nil {
+			dialog.ShowError(err, mainWindowGui)
+			return err
+		} else {
 
-		autoUpdate(updateInterval, creds, rootPath)
-	}
+		}
+	*/
+	core.UpdateOrCheckTokenCache("", 3, "chain", rootPath)
+	core.DataFetch(creds, rootPath)
+	mainWindow(creds)
+	loggedIn = true
+	closeUpdatingDialog()
+
+	autoUpdate(updateInterval, creds, rootPath)
 	return nil
 }

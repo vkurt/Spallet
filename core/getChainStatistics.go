@@ -1,13 +1,7 @@
 package core
 
 import (
-	"encoding/hex"
-	"fmt"
 	"math/big"
-
-	"time"
-
-	scriptbuilder "github.com/phantasma-io/phantasma-go/pkg/vm/script_builder"
 )
 
 const soulMasterRewardPool = 125000
@@ -31,7 +25,7 @@ type ChainStatisticsData struct {
 
 var LatestChainStatisticsData ChainStatisticsData
 
-func GetChainStatistics() error {
+/*func GetChainStatistics() error {
 	currentTime := time.Now().Unix()
 	passedTimeFromLastFetch := currentTime - LatestChainStatisticsData.DataFetchTime
 
@@ -45,10 +39,18 @@ func GetChainStatistics() error {
 		script := sbGetLastMasterClaim.EndScript()
 		encodedScript := hex.EncodeToString(script)
 		response, err := Client.InvokeRawScript(UserSettings.ChainName, encodedScript)
-		LatestChainStatisticsData.LastMasterClaimTimestamp = response.DecodeResult().AsNumber().Int64()
-		if err != nil {
-			return fmt.Errorf("error fetching last Master claim date: %v", err)
+		a, _ := response.DecodeResultWithError()
+		if a == nil {
+			LatestChainStatisticsData.LastMasterClaimTimestamp = 0
+		} else {
+			LatestChainStatisticsData.LastMasterClaimTimestamp = a.AsNumber().Int64()
+			if err != nil {
+				LatestChainStatisticsData.LastMasterClaimTimestamp = 0
+				return fmt.Errorf("error fetching last Master claim date: %v", err)
+			}
+
 		}
+
 		// ***
 
 		// getting total staked soul
@@ -76,14 +78,21 @@ func GetChainStatistics() error {
 		encodedScript = hex.EncodeToString(script)
 		response, err = Client.InvokeRawScript(UserSettings.ChainName, encodedScript)
 		if err != nil {
+			LatestChainStatisticsData.LastInflationTimeStamp = 1
+
+			LatestChainStatisticsData.TotalMaster = 1
+
+			LatestChainStatisticsData.EligibleMaster = 1
+
 			return fmt.Errorf("error fetching chain statistics: %v", err)
 		}
 		if len(response.Results) > 0 {
-			LatestChainStatisticsData.LastInflationTimeStamp = response.DecodeResults(0).AsNumber().Int64()
-
-			LatestChainStatisticsData.TotalMaster = int16(response.DecodeResults(1).AsNumber().Int64())
-
-			LatestChainStatisticsData.EligibleMaster = int16(response.DecodeResults(2).AsNumber().Int64())
+			a, _ = response.DecodeResultsWithError(0)
+			LatestChainStatisticsData.LastInflationTimeStamp = a.AsNumber().Int64()
+			a, _ = response.DecodeResultsWithError(1)
+			LatestChainStatisticsData.TotalMaster = int16(a.AsNumber().Int64())
+			a, _ = response.DecodeResultsWithError(2)
+			LatestChainStatisticsData.EligibleMaster = int16(a.AsNumber().Int64())
 		} else {
 			LatestChainStatisticsData.LastInflationTimeStamp = 1
 
@@ -135,6 +144,7 @@ func GetChainStatistics() error {
 
 	return nil
 }
+*/
 
 // func saveLatestChainData(filename string, chainData ChainStatisticsData) error {
 // 	data, err := json.Marshal(chainData)

@@ -193,6 +193,7 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 		if err != nil {
 			return err
 		}
+
 		// buildAndShowTxes(walletAddress, 1, 10)
 		LatestAccountData.NftTypes = 0
 		LatestAccountData.TotalNft = 0
@@ -328,10 +329,10 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 		check := 0
 
 		if LatestAccountData.IsSoulMaster {
-			sb.CallContract("stake", "GetStakeTimestamp", walletAddress)    //returns last stake timestamp
-			sb.CallContract("stake", "GetTimeBeforeUnstake", walletAddress) //returns past time from last kcal generation
-			sb.CallContract("stake", "GetMasterDate", walletAddress)        // used for Phantasma Crown eligibility, returns first date of being soulmaster
-			sb.CallContract("account", "LookUpAddress", walletAddress)      // returns wallet's onchain name
+			//sb.CallContract("stake", "GetStakeTimestamp", walletAddress)    //returns last stake timestamp
+			//sb.CallContract("stake", "GetTimeBeforeUnstake", walletAddress) //returns past time from last kcal generation
+			//sb.CallContract("stake", "GetMasterDate", walletAddress)        // used for Phantasma Crown eligibility, returns first date of being soulmaster
+			sb.CallContract("account", "LookUpAddress", walletAddress) // returns wallet's onchain name
 			script1 := sb.EndScript()
 			encodedScript1 = hex.EncodeToString(script1)
 
@@ -344,9 +345,9 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 			check = 1
 
 		} else if LatestAccountData.IsStaker {
-			sb.CallContract("stake", "GetStakeTimestamp", walletAddress)    //returns last stake timestamp
-			sb.CallContract("stake", "GetTimeBeforeUnstake", walletAddress) //returns past time from last kcal generation
-			sb.CallContract("account", "LookUpAddress", walletAddress)      // returns wallet's onchain name
+			//sb.CallContract("stake", "GetStakeTimestamp", walletAddress)    //returns last stake timestamp
+			//sb.CallContract("stake", "GetTimeBeforeUnstake", walletAddress) //returns past time from last kcal generation
+			sb.CallContract("account", "LookUpAddress", walletAddress) // returns wallet's onchain name
 			script := sb.EndScript()
 			encodedScript1 = hex.EncodeToString(script)
 			check = 2
@@ -359,7 +360,7 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 		if check >= 1 {
 			checkResponse1, err := Client.InvokeRawScript(UserSettings.ChainName, encodedScript1)
 			if err != nil {
-				panic("Script1 invocation failed! Error: " + err.Error())
+				fmt.Println("Script1 invocation failed! Error: " + err.Error())
 			}
 			response1 = checkResponse1
 
@@ -381,17 +382,22 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 
 		if check == 1 {
 			if len(response1.Results) > 0 {
-				LatestAccountData.LastStakeTimestamp = response1.DecodeResults(0).AsNumber().Int64()
-				passedTimeAfterKcalGen := response1.DecodeResults(1).AsNumber().Int64()
-				LatestAccountData.SoulmasterSince = response1.DecodeResults(2).AsNumber().Int64()
-				LatestAccountData.OnChainName = response1.DecodeResults(3).AsString()
-				LatestAccountData.RemainedTimeForKcalGen = 86400 - passedTimeAfterKcalGen
+				a, _ := response1.DecodeResultsWithError(0)
+
+				//LatestAccountData.LastStakeTimestamp = a.AsNumber().Int64()
+				//a, _ = response1.DecodeResultsWithError(1)
+				//passedTimeAfterKcalGen := account.Stakes.Time
+				//a, _ = response1.DecodeResultsWithError(2)
+				//LatestAccountData.SoulmasterSince = a.AsNumber().Int64()
+				//a, _ = response1.DecodeResultsWithError(1)
+				LatestAccountData.OnChainName = a.AsString()
+				LatestAccountData.RemainedTimeForKcalGen = 0
 			} else {
 				LatestAccountData.LastStakeTimestamp = 1
 
 				LatestAccountData.SoulmasterSince = 1
 				LatestAccountData.OnChainName = "anonymous"
-				LatestAccountData.RemainedTimeForKcalGen = 86400
+				LatestAccountData.RemainedTimeForKcalGen = 0
 			}
 
 			// fmt.Printf("passedTimeAfterKcalGen %v \n", passedTimeAfterKcalGen)
@@ -438,15 +444,16 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 
 		} else if check == 2 {
 			if len(response1.Results) > 0 {
-				LatestAccountData.LastStakeTimestamp = response1.DecodeResults(0).AsNumber().Int64()
-				passedTimeAfterKcalGen := response1.DecodeResults(1).AsNumber().Int64()
-				LatestAccountData.OnChainName = response1.DecodeResults(2).AsString()
-				LatestAccountData.RemainedTimeForKcalGen = 86400 - passedTimeAfterKcalGen
+
+				LatestAccountData.LastStakeTimestamp = int64(account.Stakes.Time)
+				a, _ := response1.DecodeResultsWithError(1)
+				LatestAccountData.OnChainName = a.AsString()
+				LatestAccountData.RemainedTimeForKcalGen = 0
 			} else {
 				LatestAccountData.LastStakeTimestamp = 1
 
 				LatestAccountData.OnChainName = "anonymous"
-				LatestAccountData.RemainedTimeForKcalGen = 86400
+				LatestAccountData.RemainedTimeForKcalGen = 0
 			}
 
 			LatestAccountData.KcalDailyProd = CalculateKcalDailyProd(LatestAccountData.KcalBoost, LatestAccountData.StakedBalances.Amount, KcalProdRate)
@@ -466,6 +473,9 @@ func GetAccountData(walletAddress string, creds Credentials, rootPath string) er
 		fmt.Println("accKcalBoost accIsSoulMaster ", LatestAccountData.KcalBoost, LatestAccountData.IsSoulMaster)
 
 		accSoulAmount := LatestAccountData.FungibleTokens["SOUL"].Amount
+		if LatestAccountData.StakedBalances.Amount == nil {
+			LatestAccountData.StakedBalances.Amount = big.NewInt(0)
+		}
 
 		if accSoulAmount == nil {
 			accSoulAmount = big.NewInt(0)
@@ -507,7 +517,9 @@ func CalculateKcalDailyProd(accKcalBoost int16, stakedAmountKcalCalc *big.Int, K
 	// Convert accKcalBoost to *big.Float and calculate boost factor
 	boostFactor := new(big.Float).SetFloat64(float64(accKcalBoost) / 100.0)
 	boostFactor = boostFactor.Add(boostFactor, big.NewFloat(1.0))
-
+	if stakedAmountKcalCalc == nil {
+		stakedAmountKcalCalc = big.NewInt(0)
+	}
 	// Decimal correction for stakedAmountKcalCalc: soul 8 decimals but kcal 10
 	stakedAmountKcalCalcCorrected := new(big.Int).Mul(stakedAmountKcalCalc, big.NewInt(100))
 

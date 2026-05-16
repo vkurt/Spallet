@@ -140,6 +140,9 @@ func buildBadges() *fyne.Container {
 	badgesSize := imageContainer.MinSize()
 	accBadges.Content = imageContainer
 	accBadges.SetMinSize(badgesSize)
-	accBadges.Refresh()
+	if accBadges != nil {
+		accBadges.Refresh()
+	}
+
 	return imageContainer
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/phantasma-io/phantasma-go/pkg/blockchain"
 	"github.com/phantasma-io/phantasma-go/pkg/cryptography"
+	"github.com/phantasma-io/phantasma-go/pkg/vm"
 	scriptbuilder "github.com/phantasma-io/phantasma-go/pkg/vm/script_builder"
 )
 
@@ -77,7 +78,7 @@ func GenerateFromList(userTokens []string, pools []string) []string {
 	return fromListSlice
 }
 func UpdatePools(rootPath string) error {
-
+	var a *vm.VMObject
 	currentPoolCount, err := getCountOfTokenPairsAndReserveKeys()
 	if err != nil {
 		return err
@@ -122,7 +123,8 @@ func UpdatePools(rootPath string) error {
 
 			fmt.Println("Result count ", len(responsePairKeys.Results))
 			for i := range responsePairKeys.Results {
-				poolWithKey := responsePairKeys.DecodeResults(i).AsString()
+				a, _ = responsePairKeys.DecodeResultsWithError(i)
+				poolWithKey := a.AsString()
 				pool := removeKey(poolWithKey)
 				LatestDexPools.PoolList = append(LatestDexPools.PoolList, pool)
 				fmt.Printf("added pool: %v to list\n", pool)
@@ -180,8 +182,8 @@ func getCountOfTokenPairsAndReserveKeys() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-
-	count := response.DecodeResult().AsNumber().Int64()
+	a, _ := response.DecodeResultWithError()
+	count := a.AsNumber().Int64()
 
 	fmt.Printf("Total token pairs and reserve keys listed: %v\n", count)
 	return int(count), nil
@@ -211,8 +213,10 @@ func GetPoolReserves(pool string, rootPath string) (Pool, error) {
 	if err != nil {
 		return Pool{}, err
 	}
-	reserve1 := responseValue.DecodeResults(0).AsNumber()
-	reserve2 := responseValue.DecodeResults(1).AsNumber()
+	a, _ := responseValue.DecodeResultsWithError(0)
+	reserve1 := a.AsNumber()
+	a, _ = responseValue.DecodeResultsWithError(1)
+	reserve2 := a.AsNumber()
 	token1Data, _ := UpdateOrCheckTokenCache(poolReserveTokens[0], 3, "check", rootPath)
 	token2Data, _ := UpdateOrCheckTokenCache(poolReserveTokens[1], 3, "check", rootPath)
 
@@ -702,7 +706,8 @@ func ExecuteSwap(route []TransactionDataForDex, slippageTolerance float64, creds
 
 	swapPayload := []byte(payload)
 	sb := scriptbuilder.BeginScript()
-	sb.AllowGas(wallet.Address, cryptography.NullAddress().Text(), UserSettings.GasPrice, dexGasLimit)
+	walletAddress, _ := cryptography.FromString(wallet.Address)
+	sb.AllowGas(walletAddress, cryptography.NullAddress(), UserSettings.GasPrice, dexGasLimit)
 
 	for _, tx := range route {
 		// Debug print script parameters
@@ -723,7 +728,7 @@ func ExecuteSwap(route []TransactionDataForDex, slippageTolerance float64, creds
 		)
 	}
 
-	sb.SpendGas(wallet.Address)
+	sb.SpendGas(walletAddress)
 	script := sb.EndScript()
 
 	fmt.Printf("\nGenerated script hex: %x\n", script)

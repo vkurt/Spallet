@@ -62,12 +62,12 @@ func buildNftTransaction(WIF string, nftsToSend map[string][]string, to string, 
 	expire := time.Now().UTC().Add(time.Second * 300).Unix()
 	fmt.Println("expiration time: ", expire)
 	sb := scriptbuilder.BeginScript()
-	sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().Text(), core.UserSettings.GasPrice, nftFeeLimit)
+	sb.AllowGas(keyPair.Address(), cryptography.NullAddress(), core.UserSettings.GasPrice, nftFeeLimit)
 	for id, symbol := range nftsToSend {
 		fmt.Printf("Sending nft : %v %v\n", symbol[0], id)
 		sb.CallInterop("Runtime.TransferToken", keyPair.Address().Text(), to, symbol[0], id)
 	}
-	sb.SpendGas(keyPair.Address().Text())
+	sb.SpendGas(keyPair.Address())
 	script := sb.EndScript()
 	tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Transfer"))
 	tx.Sign(keyPair)
@@ -329,7 +329,10 @@ func showSendNFTDia(symbol string, creds core.Credentials) {
 		d := dialog.NewCustomWithoutButtons(senNftDiaTitle, nftDiaContent, mainWindowGui)
 		d.Resize(fyne.NewSize(720, 540))
 		currentMainDialog = d
-		currentMainDialog.Refresh()
+		if dexTab != nil {
+			currentMainDialog.Refresh()
+		}
+
 		currentMainDialog.Show()
 		mainWindowGui.Canvas().Focus(recipient)
 

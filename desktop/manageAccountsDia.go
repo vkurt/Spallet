@@ -344,9 +344,9 @@ func manageAccountsDia(creds core.Credentials) { // migrating accounts have a bu
 
 									expire := time.Now().UTC().Add(time.Second * 300).Unix()
 									sb := scriptbuilder.BeginScript()
-									sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().String(), core.UserSettings.GasPrice, migAccFeeLimit)
+									sb.AllowGas(keyPair.Address(), cryptography.NullAddress(), core.UserSettings.GasPrice, migAccFeeLimit)
 									sb.CallContract("account", "migrate", keyPair.Address().Text(), migToAccAddr)
-									sb.SpendGas(keyPair.Address().Text())
+									sb.SpendGas(keyPair.Address())
 									script := sb.EndScript()
 
 									tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Account Migration"))
@@ -539,9 +539,9 @@ func manageAccountsDia(creds core.Credentials) { // migrating accounts have a bu
 
 								expire := time.Now().UTC().Add(time.Second * 300).Unix()
 								sb := scriptbuilder.BeginScript()
-								sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().String(), core.UserSettings.GasPrice, migAccFeeLimit)
+								sb.AllowGas(keyPair.Address(), cryptography.NullAddress(), core.UserSettings.GasPrice, migAccFeeLimit)
 								sb.CallContract("account", "migrate", keyPair.Address().Text(), genAddress)
-								sb.SpendGas(keyPair.Address().Text())
+								sb.SpendGas(keyPair.Address())
 								script := sb.EndScript()
 
 								tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Account Migration"))
@@ -738,9 +738,9 @@ func manageAccountsDia(creds core.Credentials) { // migrating accounts have a bu
 
 									expire := time.Now().UTC().Add(time.Second * 300).Unix()
 									sb := scriptbuilder.BeginScript()
-									sb.AllowGas(keyPair.Address().Text(), cryptography.NullAddress().String(), core.UserSettings.GasPrice, migAccFeeLimit)
+									sb.AllowGas(keyPair.Address(), cryptography.NullAddress(), core.UserSettings.GasPrice, migAccFeeLimit)
 									sb.CallContract("account", "migrate", keyPair.Address().Text(), migToKeyAddress)
-									sb.SpendGas(keyPair.Address().Text())
+									sb.SpendGas(keyPair.Address())
 									script := sb.EndScript()
 
 									tx := blockchain.NewTransaction(core.UserSettings.NetworkName, core.UserSettings.ChainName, script, uint32(expire), []byte(mainPayload+" Account Migration"))

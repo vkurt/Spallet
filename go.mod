@@ -2,7 +2,7 @@ module spallet
 
 go 1.25.0
 
-require github.com/phantasma-io/phantasma-go v0.0.0-20250416032013-5cd71c2a2228
+require github.com/phantasma-io/phantasma-go v0.7.0
 
 require (
 	fyne.io/systray v1.11.0 // indirect
